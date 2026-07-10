@@ -1,0 +1,124 @@
+import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
+import { db } from "@/db";
+import { detailTransaksi, menu, stockMasuk, transaksi, tutupKasir } from "@/db/schema";
+import { getTodayDateStringWIB, getTodayRangeWIB } from "@/lib/date";
+
+export class SudahTutupKasirError extends Error {
+  constructor() {
+    super("Kasir hari ini sudah ditutup sebelumnya.");
+    this.name = "SudahTutupKasirError";
+  }
+}
+
+export interface RingkasanHarian {
+  totalPenjualan: number;
+  totalPengeluaran: number;
+  labaKotor: number;
+  menuTerlaris: { menuId: string; nama: string; qty: number } | null;
+}
+
+/**
+ * Ringkasan transaksi aktif + stock masuk hari ini (WIB), dihitung live (belum tersimpan).
+ * labaKotor di sini = totalPenjualan - totalPengeluaran (cash-flow harian, selaras dengan
+ * "saldo" di modul Keuangan) — BEDA dari "Laba Kotor" di Dashboard yang berbasis margin
+ * per item (hargaJual - hpp). Field ini yang disimpan ke tabel tutup_kasir.
+ */
+export async function getRingkasanHarian(now: Date = new Date()): Promise<RingkasanHarian> {
+  const { start, end } = getTodayRangeWIB(now);
+
+  const [transaksiHariIni, stockMasukHariIni] = await Promise.all([
+    db
+      .select()
+      .from(transaksi)
+      .where(and(eq(transaksi.status, "aktif"), gte(transaksi.tanggal, start), lt(transaksi.tanggal, end))),
+    db
+      .select({ totalPengeluaran: stockMasuk.totalPengeluaran })
+      .from(stockMasuk)
+      .where(and(gte(stockMasuk.tanggal, start), lt(stockMasuk.tanggal, end))),
+  ]);
+
+  const totalPenjualan = transaksiHariIni.reduce((sum, t) => sum + Number(t.totalPemasukan), 0);
+  const totalPengeluaran = stockMasukHariIni.reduce((sum, s) => sum + Number(s.totalPengeluaran), 0);
+
+  let menuTerlaris: RingkasanHarian["menuTerlaris"] = null;
+  if (transaksiHariIni.length > 0) {
+    const details = await db
+      .select({ menuId: detailTransaksi.menuId, qty: detailTransaksi.qty, menuNama: menu.nama })
+      .from(detailTransaksi)
+      .innerJoin(menu, eq(menu.id, detailTransaksi.menuId))
+      .where(
+        inArray(
+          detailTransaksi.transaksiId,
+          transaksiHariIni.map((t) => t.id)
+        )
+      );
+
+    const qtyByMenu = new Map<string, { nama: string; qty: number }>();
+    for (const d of details) {
+      const cur = qtyByMenu.get(d.menuId) ?? { nama: d.menuNama, qty: 0 };
+      cur.qty += d.qty;
+      qtyByMenu.set(d.menuId, cur);
+    }
+    const sorted = [...qtyByMenu.entries()].sort((a, b) => b[1].qty - a[1].qty);
+    if (sorted.length > 0) {
+      menuTerlaris = { menuId: sorted[0][0], nama: sorted[0][1].nama, qty: sorted[0][1].qty };
+    }
+  }
+
+  return {
+    totalPenjualan,
+    totalPengeluaran,
+    labaKotor: totalPenjualan - totalPengeluaran,
+    menuTerlaris,
+  };
+}
+
+/** Baris tutup_kasir untuk tanggal hari ini (WIB), null kalau belum ditutup. */
+export async function getTutupKasirHariIni(now: Date = new Date()) {
+  const tanggal = getTodayDateStringWIB(now);
+  const [row] = await db
+    .select({ tutupKasir, menuTerlarisNama: menu.nama })
+    .from(tutupKasir)
+    .leftJoin(menu, eq(menu.id, tutupKasir.menuTerlarisId))
+    .where(eq(tutupKasir.tanggal, tanggal))
+    .limit(1);
+  if (!row) return null;
+  return { ...row.tutupKasir, menuTerlarisNama: row.menuTerlarisNama };
+}
+
+/** Tutup kasir hari ini — snapshot ringkasan harian ke tabel tutup_kasir. Tolak kalau sudah pernah ditutup. */
+export async function createTutupKasir(now: Date = new Date()) {
+  const tanggal = getTodayDateStringWIB(now);
+
+  return db.transaction(async (tx) => {
+    const [existing] = await tx.select().from(tutupKasir).where(eq(tutupKasir.tanggal, tanggal)).limit(1);
+    if (existing) throw new SudahTutupKasirError();
+
+    const ringkasan = await getRingkasanHarian(now);
+
+    const [row] = await tx
+      .insert(tutupKasir)
+      .values({
+        tanggal,
+        totalPenjualan: ringkasan.totalPenjualan.toFixed(2),
+        totalPengeluaran: ringkasan.totalPengeluaran.toFixed(2),
+        labaKotor: ringkasan.labaKotor.toFixed(2),
+        menuTerlarisId: ringkasan.menuTerlaris?.menuId ?? null,
+      })
+      .returning();
+
+    return row;
+  });
+}
+
+/** Riwayat tutup kasir, terbaru dulu. */
+export async function listRiwayatTutupKasir(limit = 30) {
+  const rows = await db
+    .select({ tutupKasir, menuTerlarisNama: menu.nama })
+    .from(tutupKasir)
+    .leftJoin(menu, eq(menu.id, tutupKasir.menuTerlarisId))
+    .orderBy(desc(tutupKasir.tanggal))
+    .limit(limit);
+
+  return rows.map((r) => ({ ...r.tutupKasir, menuTerlarisNama: r.menuTerlarisNama }));
+}
