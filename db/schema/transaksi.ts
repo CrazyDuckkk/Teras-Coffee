@@ -1,6 +1,7 @@
 import { index, numeric, pgEnum, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
 
 export const statusTransaksiEnum = pgEnum("status_transaksi", ["aktif", "void"]);
+export const metodeBayarEnum = pgEnum("metode_bayar", ["tunai", "hutang"]);
 
 export const transaksi = pgTable(
   "transaksi",
@@ -9,6 +10,8 @@ export const transaksi = pgTable(
     tanggal: timestamp("tanggal", { withTimezone: true }).notNull().defaultNow(),
     totalPemasukan: numeric("total_pemasukan", { precision: 12, scale: 2 }).notNull(),
     status: statusTransaksiEnum("status").notNull().default("aktif"),
+    // Transaksi lama (sebelum fitur Hutang) semua tunai — default 'tunai' aman untuk retrofit.
+    metodeBayar: metodeBayarEnum("metode_bayar").notNull().default("tunai"),
     voidedAt: timestamp("voided_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

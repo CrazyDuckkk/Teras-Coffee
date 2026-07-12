@@ -1,6 +1,6 @@
-import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { db } from "@/db";
-import { detailTransaksi, menu, stockMasuk, transaksi, tutupKasir } from "@/db/schema";
+import { detailTransaksi, hutang, menu, stockMasuk, transaksi, tutupKasir } from "@/db/schema";
 import { getTodayDateStringWIB, getTodayRangeWIB } from "@/lib/date";
 
 export class SudahTutupKasirError extends Error {
@@ -19,25 +19,46 @@ export interface RingkasanHarian {
 
 /**
  * Ringkasan transaksi aktif + stock masuk hari ini (WIB), dihitung live (belum tersimpan).
- * labaKotor di sini = totalPenjualan - totalPengeluaran (cash-flow harian, selaras dengan
- * "saldo" di modul Keuangan) — BEDA dari "Laba Kotor" di Dashboard yang berbasis margin
- * per item (hargaJual - hpp). Field ini yang disimpan ke tabel tutup_kasir.
+ * totalPenjualan/labaKotor di sini adalah angka CASH-FLOW (selaras dengan "saldo" di modul
+ * Keuangan): transaksi TUNAI hari ini + hutang yang dilunasi hari ini (walau transaksi
+ * hutangnya sendiri terjadi di hari lain) — hutang yang belum lunas TIDAK ikut dihitung.
+ * BEDA dari "Laba Kotor" di Dashboard yang berbasis margin per item (hargaJual - hpp) atas
+ * SEMUA penjualan aktif hari ini (termasuk hutang yang belum lunas — barang sudah keluar).
+ * menuTerlaris juga dihitung dari semua penjualan aktif hari ini, bukan cuma yang tunai.
+ * Field totalPenjualan/labaKotor inilah yang disimpan ke tabel tutup_kasir.
  */
 export async function getRingkasanHarian(now: Date = new Date()): Promise<RingkasanHarian> {
   const { start, end } = getTodayRangeWIB(now);
 
-  const [transaksiHariIni, stockMasukHariIni] = await Promise.all([
+  const [transaksiHariIni, transaksiTunaiHariIni, hutangLunasHariIni, stockMasukHariIni] = await Promise.all([
     db
       .select()
       .from(transaksi)
       .where(and(eq(transaksi.status, "aktif"), gte(transaksi.tanggal, start), lt(transaksi.tanggal, end))),
+    db
+      .select({ totalPemasukan: transaksi.totalPemasukan })
+      .from(transaksi)
+      .where(
+        and(
+          eq(transaksi.status, "aktif"),
+          eq(transaksi.metodeBayar, "tunai"),
+          gte(transaksi.tanggal, start),
+          lt(transaksi.tanggal, end)
+        )
+      ),
+    db
+      .select({ jumlah: hutang.jumlah })
+      .from(hutang)
+      .where(and(eq(hutang.status, "lunas"), isNotNull(hutang.tanggalLunas), gte(hutang.tanggalLunas, start), lt(hutang.tanggalLunas, end))),
     db
       .select({ totalPengeluaran: stockMasuk.totalPengeluaran })
       .from(stockMasuk)
       .where(and(gte(stockMasuk.tanggal, start), lt(stockMasuk.tanggal, end))),
   ]);
 
-  const totalPenjualan = transaksiHariIni.reduce((sum, t) => sum + Number(t.totalPemasukan), 0);
+  const totalPenjualan =
+    transaksiTunaiHariIni.reduce((sum, t) => sum + Number(t.totalPemasukan), 0) +
+    hutangLunasHariIni.reduce((sum, h) => sum + Number(h.jumlah), 0);
   const totalPengeluaran = stockMasukHariIni.reduce((sum, s) => sum + Number(s.totalPengeluaran), 0);
 
   let menuTerlaris: RingkasanHarian["menuTerlaris"] = null;

@@ -7,5 +7,7 @@ export const cartItemSchema = z.object({
 
 export const transaksiCreateSchema = z.object({
   items: z.array(cartItemSchema).min(1, "Keranjang tidak boleh kosong"),
+  metodeBayar: z.enum(["tunai", "hutang"]).default("tunai"),
+  namaPelanggan: z.string().trim().min(1).optional(),
 });
 export type TransaksiCreateInput = z.infer<typeof transaksiCreateSchema>;

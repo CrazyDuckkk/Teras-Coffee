@@ -67,6 +67,7 @@ export function RiwayatTransaksi({ data }: { data: TransaksiRow[] }) {
                 ) : (
                   <Badge className="bg-success text-success-foreground">Aktif</Badge>
                 )}
+                {t.metodeBayar === "hutang" && <Badge variant="outline">Hutang</Badge>}
               </div>
               <span className="text-xs text-muted-foreground">
                 {t.items.map((i) => `${i.menuNama} x${i.qty}`).join(", ")}

@@ -6,4 +6,5 @@ export * from "./transaksi";
 export * from "./detail-transaksi";
 export * from "./stock-masuk";
 export * from "./tutup-kasir";
+export * from "./hutang";
 export * from "./auth";

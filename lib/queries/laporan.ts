@@ -1,6 +1,6 @@
-import { and, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { db } from "@/db";
-import { detailTransaksi, menu, stockMasuk, transaksi } from "@/db/schema";
+import { detailTransaksi, hutang, menu, stockMasuk, transaksi } from "@/db/schema";
 import { getRangeLastNDaysWIB, getTodayRangeWIB } from "@/lib/date";
 
 export type PeriodeLaporan = "harian" | "mingguan" | "bulanan";
@@ -31,27 +31,46 @@ function getPeriodeRange(periode: PeriodeLaporan): { start: Date; end: Date } {
 /**
  * Laporan dihitung live dari transaksi + stock_masuk (bukan tabel tersendiri, selaras
  * dengan pendekatan Keuangan). Hanya transaksi aktif (void dikecualikan).
- * - labaRugi = totalPemasukan - totalPengeluaran (periode)
- * - menuTerlaris = ranking berdasarkan qty terjual
- * - menuMargin = ranking berdasarkan margin per porsi (hargaJualSaatItu - hppSaatItu),
- *   dipakai untuk "Menu Paling Untung/Boncos" — margin per unit dipilih (bukan total profit)
- *   supaya item boncos tetap terlihat walau volume penjualannya kecil.
+ * - labaRugi = totalPemasukan - totalPengeluaran (periode) — angka CASH-FLOW: transaksi
+ *   tunai + hutang yang dilunasi dalam periode ini (berdasar tanggal_lunas), hutang yang
+ *   belum lunas belum dihitung. Selaras dengan modul Keuangan & Tutup Kasir.
+ * - menuTerlaris/menuMargin = ranking berdasarkan SEMUA penjualan aktif periode ini
+ *   (termasuk hutang yang belum lunas — barang sudah keluar, terlepas dari status bayar).
+ *   menuMargin dipakai untuk "Menu Paling Untung/Boncos" — margin per unit dipilih (bukan
+ *   total profit) supaya item boncos tetap terlihat walau volume penjualannya kecil.
  */
 export async function getLaporan(periode: PeriodeLaporan = "harian") {
   const { start, end } = getPeriodeRange(periode);
 
-  const [transaksiRange, pengeluaranRange] = await Promise.all([
+  const [transaksiRange, transaksiTunaiRange, hutangLunasRange, pengeluaranRange] = await Promise.all([
     db
       .select({ id: transaksi.id, totalPemasukan: transaksi.totalPemasukan })
       .from(transaksi)
       .where(and(eq(transaksi.status, "aktif"), gte(transaksi.tanggal, start), lt(transaksi.tanggal, end))),
+    db
+      .select({ totalPemasukan: transaksi.totalPemasukan })
+      .from(transaksi)
+      .where(
+        and(
+          eq(transaksi.status, "aktif"),
+          eq(transaksi.metodeBayar, "tunai"),
+          gte(transaksi.tanggal, start),
+          lt(transaksi.tanggal, end)
+        )
+      ),
+    db
+      .select({ jumlah: hutang.jumlah })
+      .from(hutang)
+      .where(and(eq(hutang.status, "lunas"), isNotNull(hutang.tanggalLunas), gte(hutang.tanggalLunas, start), lt(hutang.tanggalLunas, end))),
     db
       .select({ totalPengeluaran: stockMasuk.totalPengeluaran })
       .from(stockMasuk)
       .where(and(gte(stockMasuk.tanggal, start), lt(stockMasuk.tanggal, end))),
   ]);
 
-  const totalPemasukan = transaksiRange.reduce((sum, t) => sum + Number(t.totalPemasukan), 0);
+  const totalPemasukan =
+    transaksiTunaiRange.reduce((sum, t) => sum + Number(t.totalPemasukan), 0) +
+    hutangLunasRange.reduce((sum, h) => sum + Number(h.jumlah), 0);
   const totalPengeluaran = pengeluaranRange.reduce((sum, r) => sum + Number(r.totalPengeluaran), 0);
 
   let ranking: MenuRanking[] = [];

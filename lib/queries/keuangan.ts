@@ -1,6 +1,6 @@
-import { and, eq, gte, lt } from "drizzle-orm";
+import { and, eq, gte, isNotNull, lt } from "drizzle-orm";
 import { db } from "@/db";
-import { bahanBaku, stockMasuk, transaksi } from "@/db/schema";
+import { bahanBaku, hutang, stockMasuk, transaksi } from "@/db/schema";
 import { getRangeLastNDaysWIB, getTodayRangeWIB } from "@/lib/date";
 
 export type PeriodeKeuangan = "hari-ini" | "7-hari" | "30-hari" | "semua";
@@ -28,25 +28,35 @@ export function getPeriodeRange(periode: PeriodeKeuangan): { start?: Date; end?:
 }
 
 /**
- * Keuangan = gabungan (bukan tabel terpisah): transaksi aktif sebagai pemasukan,
- * stock_masuk sebagai pengeluaran. Transaksi void TIDAK dihitung.
+ * Keuangan = gabungan (bukan tabel terpisah): transaksi TUNAI aktif + hutang yang SUDAH
+ * LUNAS sebagai pemasukan (dengan tanggal_lunas, bukan tanggal transaksi awal), stock_masuk
+ * sebagai pengeluaran. Transaksi void TIDAK dihitung. Hutang yang belum lunas belum masuk
+ * cash-flow sama sekali — baru muncul di sini setelah ditandai lunas (lihat lib/queries/hutang.ts).
  */
 export async function getKeuangan(periode: PeriodeKeuangan = "30-hari") {
   const { start, end } = getPeriodeRange(periode);
 
-  const pemasukanFilters = [eq(transaksi.status, "aktif")];
-  if (start) pemasukanFilters.push(gte(transaksi.tanggal, start));
-  if (end) pemasukanFilters.push(lt(transaksi.tanggal, end));
+  const pemasukanTunaiFilters = [eq(transaksi.status, "aktif"), eq(transaksi.metodeBayar, "tunai")];
+  if (start) pemasukanTunaiFilters.push(gte(transaksi.tanggal, start));
+  if (end) pemasukanTunaiFilters.push(lt(transaksi.tanggal, end));
+
+  const hutangLunasFilters = [eq(hutang.status, "lunas"), isNotNull(hutang.tanggalLunas)];
+  if (start) hutangLunasFilters.push(gte(hutang.tanggalLunas, start));
+  if (end) hutangLunasFilters.push(lt(hutang.tanggalLunas, end));
 
   const pengeluaranFilters = [];
   if (start) pengeluaranFilters.push(gte(stockMasuk.tanggal, start));
   if (end) pengeluaranFilters.push(lt(stockMasuk.tanggal, end));
 
-  const [pemasukanRows, pengeluaranRows] = await Promise.all([
+  const [pemasukanTunaiRows, hutangLunasRows, pengeluaranRows] = await Promise.all([
     db
       .select({ id: transaksi.id, tanggal: transaksi.tanggal, jumlah: transaksi.totalPemasukan })
       .from(transaksi)
-      .where(and(...pemasukanFilters)),
+      .where(and(...pemasukanTunaiFilters)),
+    db
+      .select({ id: hutang.id, tanggal: hutang.tanggalLunas, jumlah: hutang.jumlah, namaPelanggan: hutang.namaPelanggan })
+      .from(hutang)
+      .where(and(...hutangLunasFilters)),
     db
       .select({
         id: stockMasuk.id,
@@ -62,11 +72,18 @@ export async function getKeuangan(periode: PeriodeKeuangan = "30-hari") {
   ]);
 
   const entries: KeuanganEntry[] = [
-    ...pemasukanRows.map((r) => ({
+    ...pemasukanTunaiRows.map((r) => ({
       id: r.id,
       tanggal: r.tanggal,
       tipe: "pemasukan" as const,
       deskripsi: "Penjualan",
+      jumlah: Number(r.jumlah),
+    })),
+    ...hutangLunasRows.map((r) => ({
+      id: r.id,
+      tanggal: r.tanggal!,
+      tipe: "pemasukan" as const,
+      deskripsi: `Pelunasan Hutang${r.namaPelanggan ? ` — ${r.namaPelanggan}` : ""}`,
       jumlah: Number(r.jumlah),
     })),
     ...pengeluaranRows.map((r) => ({
@@ -78,7 +95,9 @@ export async function getKeuangan(periode: PeriodeKeuangan = "30-hari") {
     })),
   ].sort((a, b) => b.tanggal.getTime() - a.tanggal.getTime());
 
-  const totalPemasukan = pemasukanRows.reduce((sum, r) => sum + Number(r.jumlah), 0);
+  const totalPemasukan =
+    pemasukanTunaiRows.reduce((sum, r) => sum + Number(r.jumlah), 0) +
+    hutangLunasRows.reduce((sum, r) => sum + Number(r.jumlah), 0);
   const totalPengeluaran = pengeluaranRows.reduce((sum, r) => sum + Number(r.jumlah), 0);
 
   return {

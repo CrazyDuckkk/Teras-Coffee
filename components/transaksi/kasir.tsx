@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Currency } from "@/components/shared/currency";
-import { formatKategori } from "@/lib/format";
+import { formatKategori, sortKategoriList } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { getKasirData } from "@/lib/queries/transaksi";
 
@@ -20,8 +22,10 @@ export function Kasir({ menus, resep, bahan }: KasirData) {
   const router = useRouter();
   const [cart, setCart] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [metodeBayar, setMetodeBayar] = useState<"tunai" | "hutang">("tunai");
+  const [namaPelanggan, setNamaPelanggan] = useState("");
 
-  const kategoriList = useMemo(() => Array.from(new Set(menus.map((m) => m.kategori))).sort(), [menus]);
+  const kategoriList = useMemo(() => sortKategoriList(menus.map((m) => m.kategori)), [menus]);
   const [activeKategori, setActiveKategori] = useState("semua");
 
   const resepByMenu = useMemo(() => {
@@ -109,15 +113,21 @@ export function Kasir({ menus, resep, bahan }: KasirData) {
       const res = await fetch("/api/transaksi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: cartItems.map((i) => ({ menuId: i.menu.id, qty: i.qty })) }),
+        body: JSON.stringify({
+          items: cartItems.map((i) => ({ menuId: i.menu.id, qty: i.qty })),
+          metodeBayar,
+          namaPelanggan: metodeBayar === "hutang" && namaPelanggan.trim() ? namaPelanggan.trim() : undefined,
+        }),
       });
       const json = await res.json();
       if (!res.ok) {
         toast.error(json.error ?? "Gagal menyimpan transaksi");
         return;
       }
-      toast.success("Transaksi berhasil disimpan");
+      toast.success(metodeBayar === "hutang" ? "Transaksi hutang berhasil disimpan" : "Transaksi berhasil disimpan");
       setCart({});
+      setMetodeBayar("tunai");
+      setNamaPelanggan("");
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -232,8 +242,36 @@ export function Kasir({ menus, resep, bahan }: KasirData) {
             <span>Total</span>
             <Currency value={total} className="text-lg" />
           </div>
+          <div className="flex flex-col gap-2">
+            <Label>Metode Bayar</Label>
+            <Tabs value={metodeBayar} onValueChange={(v) => setMetodeBayar((v as typeof metodeBayar) ?? "tunai")}>
+              <TabsList className="w-full">
+                <TabsTrigger value="tunai" className="flex-1">
+                  Tunai
+                </TabsTrigger>
+                <TabsTrigger value="hutang" className="flex-1">
+                  Hutang
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+          {metodeBayar === "hutang" && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="namaPelanggan">Nama Pelanggan (opsional)</Label>
+              <Input
+                id="namaPelanggan"
+                value={namaPelanggan}
+                onChange={(e) => setNamaPelanggan(e.target.value)}
+                placeholder="Mis. Budi"
+              />
+            </div>
+          )}
           <Button disabled={cartItems.length === 0 || submitting} onClick={handleSimpan}>
-            {submitting ? "Menyimpan..." : "Simpan Transaksi"}
+            {submitting
+              ? "Menyimpan..."
+              : metodeBayar === "hutang"
+                ? "Simpan Transaksi (Hutang)"
+                : "Simpan Transaksi"}
           </Button>
         </CardContent>
       </Card>

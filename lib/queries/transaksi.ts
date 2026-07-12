@@ -1,7 +1,8 @@
 import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bahanBaku, detailTransaksi, menu, resepMenu, riwayatHargaBahan, transaksi } from "@/db/schema";
+import { bahanBaku, detailTransaksi, hutang, menu, resepMenu, riwayatHargaBahan, transaksi } from "@/db/schema";
 import { getTodayRangeWIB } from "@/lib/date";
+import { HutangSudahLunasError } from "@/lib/queries/hutang";
 import type { TransaksiCreateInput } from "@/lib/validations/transaksi";
 
 export class StokTidakCukupError extends Error {
@@ -145,21 +146,42 @@ export async function createTransaksi(input: TransaksiCreateInput) {
 
     const [row] = await tx
       .insert(transaksi)
-      .values({ totalPemasukan: totalPemasukan.toFixed(2) })
+      .values({ totalPemasukan: totalPemasukan.toFixed(2), metodeBayar: input.metodeBayar })
       .returning();
 
     await tx.insert(detailTransaksi).values(detailValues.map((d) => ({ ...d, transaksiId: row.id })));
+
+    // Hutang belum masuk Keuangan sampai ditandai lunas (lihat lib/queries/hutang.ts) — stok
+    // sudah dipotong di atas seperti biasa, barang sudah keluar terlepas dari metode bayar.
+    if (input.metodeBayar === "hutang") {
+      await tx.insert(hutang).values({
+        transaksiId: row.id,
+        namaPelanggan: input.namaPelanggan,
+        jumlah: totalPemasukan.toFixed(2),
+      });
+    }
 
     return row;
   });
 }
 
-/** Void transaksi — lock row, tolak jika sudah void, kembalikan stok bahan sesuai resep saat transaksi dibuat. */
+/**
+ * Void transaksi — lock row, tolak jika sudah void, kembalikan stok bahan sesuai resep saat
+ * transaksi dibuat. Kalau transaksi ini berasal dari Hutang: hutang yang belum lunas ikut
+ * dihapus (piutang batal karena transaksinya batal); hutang yang sudah lunas menolak void
+ * (uangnya sudah tercatat masuk di Keuangan — tidak bisa dibatalkan lewat void begitu saja).
+ */
 export async function voidTransaksi(id: string) {
   return db.transaction(async (tx) => {
     const [row] = await tx.select().from(transaksi).where(eq(transaksi.id, id)).for("update");
     if (!row) return null;
     if (row.status !== "aktif") throw new TransaksiSudahVoidError();
+
+    if (row.metodeBayar === "hutang") {
+      const [hutangRow] = await tx.select().from(hutang).where(eq(hutang.transaksiId, id)).for("update");
+      if (hutangRow?.status === "lunas") throw new HutangSudahLunasError();
+      if (hutangRow) await tx.delete(hutang).where(eq(hutang.id, hutangRow.id));
+    }
 
     const details = await tx.select().from(detailTransaksi).where(eq(detailTransaksi.transaksiId, id));
     const menuIds = [...new Set(details.map((d) => d.menuId))];
