@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { listBahanBaku } from "@/lib/queries/inventaris";
 import type { getMenuWithResep } from "@/lib/queries/menu";
+import { KATEGORI_OPTIONS, formatKategori } from "@/lib/format";
 
 type BahanBaku = Awaited<ReturnType<typeof listBahanBaku>>[number];
 type MenuWithResep = NonNullable<Awaited<ReturnType<typeof getMenuWithResep>>>;
@@ -55,8 +56,14 @@ function MenuForm({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [nama, setNama] = useState(menu?.nama ?? "");
-  const [kategori, setKategori] = useState(menu?.kategori ?? "");
+  const [kategori, setKategori] = useState(menu?.kategori ?? KATEGORI_OPTIONS[0]);
   const [hargaJual, setHargaJual] = useState(menu?.hargaJual ?? "");
+  // Menu lama mungkin punya kategori custom di luar 4 opsi tetap — tetap tampilkan sebagai
+  // pilihan supaya edit tidak diam-diam mengganti kategori menu tersebut.
+  const kategoriOptions: readonly string[] =
+    menu && !(KATEGORI_OPTIONS as readonly string[]).includes(menu.kategori)
+      ? [...KATEGORI_OPTIONS, menu.kategori]
+      : KATEGORI_OPTIONS;
   const [resep, setResep] = useState<ResepRow[]>(
     menu ? menu.resep.map((r) => ({ bahanBakuId: r.bahanBakuId, takaran: r.takaran })) : [{ bahanBakuId: "", takaran: "" }]
   );
@@ -115,19 +122,18 @@ function MenuForm({
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="kategori">Kategori</Label>
-            <Input
-              id="kategori"
-              required
-              value={kategori}
-              onChange={(e) => setKategori(e.target.value)}
-              placeholder="kopi / non-kopi / snack"
-              list="kategori-suggestions"
-            />
-            <datalist id="kategori-suggestions">
-              <option value="kopi" />
-              <option value="non-kopi" />
-              <option value="snack" />
-            </datalist>
+            <Select value={kategori} onValueChange={(v) => setKategori(v ?? "")}>
+              <SelectTrigger id="kategori" className="w-full">
+                <SelectValue placeholder="Pilih kategori">{(value: string) => formatKategori(value)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {kategoriOptions.map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {formatKategori(k)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <div className="flex flex-col gap-2">

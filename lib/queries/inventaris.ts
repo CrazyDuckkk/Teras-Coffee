@@ -116,6 +116,16 @@ export async function deactivateBahanBaku(id: string) {
   return row ?? null;
 }
 
+/** Mengaktifkan kembali bahan baku yang sebelumnya dinonaktifkan. */
+export async function reactivateBahanBaku(id: string) {
+  const [row] = await db
+    .update(bahanBaku)
+    .set({ isActive: true, updatedAt: new Date() })
+    .where(eq(bahanBaku.id, id))
+    .returning();
+  return row ?? null;
+}
+
 /**
  * Stock Masuk — transactional: insert stock_masuk, tambah stok bahan_baku,
  * dan insert riwayat_harga_bahan baru HANYA jika harga per satuan hasil hitungan

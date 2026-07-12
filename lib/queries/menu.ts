@@ -70,10 +70,12 @@ export async function listMenu(includeInactive = false): Promise<MenuWithHpp[]> 
   });
 }
 
+/** Detail menu + resep, tiap baris resep disertai harga per satuan aktif untuk breakdown kontribusi HPP di popup. */
 export async function getMenuWithResep(id: string) {
   const [row] = await db.select().from(menu).where(eq(menu.id, id)).limit(1);
   if (!row) return null;
 
+  const hargaAktif = hargaAktifSubquery();
   const resep = await db
     .select({
       id: resepMenu.id,
@@ -81,9 +83,11 @@ export async function getMenuWithResep(id: string) {
       takaran: resepMenu.takaran,
       bahanNama: bahanBaku.nama,
       satuan: bahanBaku.satuan,
+      hargaPerSatuan: hargaAktif.hargaPerSatuan,
     })
     .from(resepMenu)
     .innerJoin(bahanBaku, eq(bahanBaku.id, resepMenu.bahanBakuId))
+    .leftJoin(hargaAktif, eq(hargaAktif.bahanBakuId, resepMenu.bahanBakuId))
     .where(eq(resepMenu.menuId, id));
 
   return { ...row, resep };
@@ -144,6 +148,16 @@ export async function deactivateMenu(id: string) {
   const [row] = await db
     .update(menu)
     .set({ isActive: false, updatedAt: new Date() })
+    .where(eq(menu.id, id))
+    .returning();
+  return row ?? null;
+}
+
+/** Mengaktifkan kembali menu yang sebelumnya dinonaktifkan. */
+export async function reactivateMenu(id: string) {
+  const [row] = await db
+    .update(menu)
+    .set({ isActive: true, updatedAt: new Date() })
     .where(eq(menu.id, id))
     .returning();
   return row ?? null;

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pencil, Ban } from "lucide-react";
+import { MoreHorizontal, Pencil, Ban, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ import { Currency } from "@/components/shared/currency";
 import { formatKategori } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { MenuFormDialog } from "./menu-form-dialog";
+import { MenuResepDialog } from "./menu-resep-dialog";
 import type { listMenu } from "@/lib/queries/menu";
 import type { listBahanBaku } from "@/lib/queries/inventaris";
 import type { getMenuWithResep } from "@/lib/queries/menu";
@@ -37,25 +38,36 @@ type BahanBaku = Awaited<ReturnType<typeof listBahanBaku>>[number];
 export function MenuCard({ menu, bahanBaku }: { menu: MenuWithHpp; bahanBaku: BahanBaku[] }) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
+  const [resepOpen, setResepOpen] = useState(false);
   const [nonaktifkanOpen, setNonaktifkanOpen] = useState(false);
   const [detail, setDetail] = useState<NonNullable<Awaited<ReturnType<typeof getMenuWithResep>>> | undefined>(undefined);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [loadingDeactivate, setLoadingDeactivate] = useState(false);
+  const [loadingReactivate, setLoadingReactivate] = useState(false);
 
-  async function openEdit() {
+  async function loadDetail() {
     setLoadingDetail(true);
     try {
       const res = await fetch(`/api/menu/${menu.id}`);
       const json = await res.json();
       if (res.ok) {
         setDetail(json.data);
-        setEditOpen(true);
-      } else {
-        toast.error(json.error ?? "Gagal memuat detail menu");
+        return true;
       }
+      toast.error(json.error ?? "Gagal memuat detail menu");
+      return false;
     } finally {
       setLoadingDetail(false);
     }
+  }
+
+  async function openEdit() {
+    if (await loadDetail()) setEditOpen(true);
+  }
+
+  function openResep() {
+    setResepOpen(true);
+    if (!detail) void loadDetail();
   }
 
   async function handleNonaktifkan() {
@@ -75,50 +87,100 @@ export function MenuCard({ menu, bahanBaku }: { menu: MenuWithHpp; bahanBaku: Ba
     }
   }
 
+  async function handleAktifkanKembali() {
+    setLoadingReactivate(true);
+    try {
+      const res = await fetch(`/api/menu/${menu.id}/aktifkan`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json.error ?? "Gagal mengaktifkan kembali menu");
+        return;
+      }
+      toast.success(`${menu.nama} diaktifkan kembali`);
+      router.refresh();
+    } finally {
+      setLoadingReactivate(false);
+    }
+  }
+
   const untung = menu.untung;
 
   return (
-    <Card className="gap-3 rounded-xl border-[#E2E8F0] shadow-[0px_1px_3px_rgba(0,0,0,0.05)]">
-      <CardHeader className="flex flex-row items-start justify-between gap-2">
-        <div className="flex flex-col gap-1.5">
-          <Badge variant="secondary" className="w-fit">
-            {formatKategori(menu.kategori)}
-          </Badge>
-          <h3 className="font-medium leading-tight">{menu.nama}</h3>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Aksi" />}>
-            <MoreHorizontal className="size-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={openEdit} disabled={loadingDetail}>
-              <Pencil className="size-4" />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem variant="destructive" onClick={() => setNonaktifkanOpen(true)}>
-              <Ban className="size-4" />
-              Nonaktifkan
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-2">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Harga Jual</span>
-          <Currency value={menu.hargaJual} className="text-base font-semibold" />
-        </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">HPP</span>
-          <Currency value={menu.hpp} className="text-base" />
-        </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Untung</span>
-          <Currency
-            value={untung}
-            className={cn("text-base font-semibold", untung >= 0 ? "text-success-foreground" : "text-danger-foreground")}
-          />
-        </div>
-      </CardContent>
+    <Card className="gap-3 rounded-xl border-[#E2E8F0] shadow-[0px_1px_3px_rgba(0,0,0,0.05)] transition-shadow hover:shadow-md">
+      {/* Wrapper terpisah (bukan onClick di Card) supaya Dialog/AlertDialog di bawah — walau
+          dirender via portal — tidak ikut membuka popup resep saat diklik (React synthetic
+          event bubbling ikut JSX tree, bukan DOM tree, jadi keduanya harus di luar wrapper ini). */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={openResep}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openResep();
+          }
+        }}
+        className="flex cursor-pointer flex-col gap-3"
+      >
+        <CardHeader className="flex flex-row items-start justify-between gap-2">
+          <div className="flex flex-col gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
+              <Badge variant="secondary" className="w-fit">
+                {formatKategori(menu.kategori)}
+              </Badge>
+              {!menu.isActive && (
+                <Badge variant="outline" className="w-fit">
+                  Nonaktif
+                </Badge>
+              )}
+            </div>
+            <h3 className="font-medium leading-tight">{menu.nama}</h3>
+          </div>
+          <div onClick={(e) => e.stopPropagation()}>
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Aksi" />}>
+                <MoreHorizontal className="size-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={openEdit} disabled={loadingDetail}>
+                  <Pencil className="size-4" />
+                  Edit
+                </DropdownMenuItem>
+                {menu.isActive ? (
+                  <DropdownMenuItem variant="destructive" onClick={() => setNonaktifkanOpen(true)}>
+                    <Ban className="size-4" />
+                    Nonaktifkan
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={handleAktifkanKembali} disabled={loadingReactivate}>
+                    <RotateCcw className="size-4" />
+                    Aktifkan Kembali
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Harga Jual</span>
+            <Currency value={menu.hargaJual} className="text-base font-semibold" />
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">HPP</span>
+            <Currency value={menu.hpp} className="text-base" />
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Untung</span>
+            <Currency
+              value={untung}
+              className={cn("text-base font-semibold", untung >= 0 ? "text-success-foreground" : "text-danger-foreground")}
+            />
+          </div>
+        </CardContent>
+      </div>
+
+      <MenuResepDialog menu={menu} detail={detail} open={resepOpen} onOpenChange={setResepOpen} />
 
       {detail && (
         <MenuFormDialog mode="edit" menu={detail} bahanBaku={bahanBaku} open={editOpen} onOpenChange={setEditOpen} />

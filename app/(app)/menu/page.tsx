@@ -5,7 +5,7 @@ import { MenuActions } from "@/components/menu/menu-actions";
 import { MenuGrid } from "@/components/menu/menu-grid";
 
 export default async function MenuPage() {
-  const [menuList, bahanBakuList] = await Promise.all([listMenu(false), listBahanBaku(false)]);
+  const [menuList, bahanBakuList] = await Promise.all([listMenu(true), listBahanBaku(false)]);
 
   return (
     <div className="flex flex-col gap-6">
