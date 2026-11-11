@@ -66,7 +66,7 @@ function hargaAktifSubquery(tx: DbOrTx) {
  * -> snapshot harga_jual & hpp saat itu -> insert transaksi + detail_transaksi.
  * Gagal total (rollback) kalau ada bahan kurang.
  */
-export async function createTransaksi(input: TransaksiCreateInput) {
+export async function createTransaksi(input: TransaksiCreateInput, pelakuId: string) {
   await requireRole("owner", "cashier");
   return db.transaction(async (tx) => {
     const menuIds = [...new Set(input.items.map((i) => i.menuId))];
@@ -149,7 +149,11 @@ export async function createTransaksi(input: TransaksiCreateInput) {
 
     const [row] = await tx
       .insert(transaksi)
-      .values({ totalPemasukan: totalPemasukan.toFixed(2), metodeBayar: input.metodeBayar })
+      .values({
+        totalPemasukan: totalPemasukan.toFixed(2),
+        metodeBayar: input.metodeBayar,
+        pelakuId,
+      })
       .returning();
 
     await tx.insert(detailTransaksi).values(detailValues.map((d) => ({ ...d, transaksiId: row.id })));

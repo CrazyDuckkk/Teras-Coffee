@@ -46,11 +46,16 @@ Aplikasi web untuk operasional kedai kopi, dibuat dengan Next.js, Drizzle ORM, P
 - **Kasir** memiliki akses operasional untuk transaksi, hutang, dan tutup kasir. Menu **Stok Bahan** terlihat di navigasi, tetapi halamannya masih berupa placeholder sampai fitur kasir inventaris dikerjakan. Akses ke halaman/API khusus owner ditolak di server.
 - Owner dapat membuat dan menonaktifkan akun kasir. Penonaktifan akun juga mencabut sesi aktif akun tersebut.
 
-## Tutup Kasir dan Laporan (M2)
+## Tutup Kasir dan Laporan
 
 - Tutup kasir menyimpan ringkasan harian sekali per tanggal WIB; permintaan bersamaan juga ditolak sebagai penutupan duplikat.
 - Filter laporan harian memakai hari WIB, mingguan memakai minggu berjalan (Senin–Senin), dan bulanan memakai bulan kalender berjalan.
 - Menu terlaris dihitung dari transaksi aktif; void dikecualikan. Laba-rugi mengikuti arus kas yang tercatat pada periode tersebut.
+
+## Fondasi data (M2)
+
+- Aktivitas transaksi, Stock Masuk, dan tutup kasir menyimpan ID pelaku jika tersedia; kolom nullable menjaga catatan lama tetap valid.
+- Tabel Pengaturan menyediakan pasangan kunci/nilai beserta waktu dan pelaku perubahan.
 
 ## Pemeriksaan
 

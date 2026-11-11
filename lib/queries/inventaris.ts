@@ -141,7 +141,7 @@ export async function reactivateBahanBaku(id: string) {
  * beda dari harga aktif. Harga per satuan = totalHargaBeli / qty (bukan diinput
  * langsung) — mis. beli 1000ml susu seharga Rp40.000 -> Harga Aktif Rp40/ml.
  */
-export async function createStockMasuk(input: StockMasukCreateInput) {
+export async function createStockMasuk(input: StockMasukCreateInput, pelakuId: string) {
   await requireRole("owner");
   const hargaPerSatuanBaru = input.totalHargaBeli / input.qty;
 
@@ -175,6 +175,7 @@ export async function createStockMasuk(input: StockMasukCreateInput) {
         // Total pengeluaran = persis nilai yang dibayar user, bukan qty x harga per satuan
         // yang sudah dibulatkan (hindari drift pembulatan dari pembagian).
         totalPengeluaran: input.totalHargaBeli.toFixed(2),
+        pelakuId,
       })
       .returning();
 

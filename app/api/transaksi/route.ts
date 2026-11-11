@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const row = await createTransaksi(parsed.data);
+    const row = await createTransaksi(parsed.data, access.session.user.id);
     return NextResponse.json({ data: row }, { status: 201 });
   } catch (err) {
     if (err instanceof StokTidakCukupError) {

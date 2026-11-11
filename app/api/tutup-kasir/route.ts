@@ -7,7 +7,7 @@ export async function POST() {
   if (!access.ok) return access.response;
 
   try {
-    const row = await createTutupKasir();
+    const row = await createTutupKasir(access.session.user.id);
     return NextResponse.json(
       { data: { id: row.id, tanggal: row.tanggal } },
       { status: 201 },

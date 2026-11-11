@@ -22,6 +22,13 @@
       "when": 1794209745685,
       "tag": "0002_m1_user_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794392462337,
+      "tag": "0003_flawless_the_hand",
+      "breakpoints": true
     }
   ]
 }

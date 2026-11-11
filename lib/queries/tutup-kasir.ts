@@ -162,7 +162,7 @@ export async function getTutupKasirHariIni(now: Date = new Date()) {
 }
 
 /** Tutup kasir hari ini — snapshot ringkasan harian ke tabel tutup_kasir. Tolak kalau sudah pernah ditutup. */
-export async function createTutupKasir(now: Date = new Date()) {
+export async function createTutupKasir(pelakuId: string, now: Date = new Date()) {
   await requireRole("owner", "cashier");
   const tanggal = getTodayDateStringWIB(now);
 
@@ -181,6 +181,7 @@ export async function createTutupKasir(now: Date = new Date()) {
           totalPengeluaran: ringkasan.totalPengeluaran.toFixed(2),
           labaKotor: ringkasan.labaKotor.toFixed(2),
           menuTerlarisId: ringkasan.menuTerlaris?.menuId ?? null,
+          pelakuId,
         })
         .returning();
 

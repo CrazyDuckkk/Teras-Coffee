@@ -8,3 +8,4 @@ export * from "./stock-masuk";
 export * from "./tutup-kasir";
 export * from "./hutang";
 export * from "./auth";
+export * from "./pengaturan";
