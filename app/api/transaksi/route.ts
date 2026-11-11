@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiRole } from "@/lib/auth-guard";
 import { transaksiCreateSchema } from "@/lib/validations/transaksi";
-import { createTransaksi, listTransaksiHariIni, MenuTidakAktifError, StokTidakCukupError } from "@/lib/queries/transaksi";
+import { createTransaksi, listTransaksiTujuhHari, MenuTidakAktifError, StokTidakCukupError } from "@/lib/queries/transaksi";
 
 export async function GET() {
   const access = await requireApiRole("owner", "cashier");
   if (!access.ok) return access.response;
 
-  const data = await listTransaksiHariIni();
+  const data = await listTransaksiTujuhHari();
   return NextResponse.json({ data });
 }
 

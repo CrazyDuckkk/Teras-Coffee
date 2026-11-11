@@ -2,7 +2,7 @@ import { index, numeric, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-
 import { user } from "./auth";
 
 export const statusTransaksiEnum = pgEnum("status_transaksi", ["aktif", "void"]);
-export const metodeBayarEnum = pgEnum("metode_bayar", ["tunai", "hutang"]);
+export const metodeBayarEnum = pgEnum("metode_bayar", ["tunai", "qris", "hutang"]);
 
 export const transaksi = pgTable(
   "transaksi",

@@ -22,7 +22,7 @@ export function Kasir({ menus, resep, bahan }: KasirData) {
   const router = useRouter();
   const [cart, setCart] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [metodeBayar, setMetodeBayar] = useState<"tunai" | "hutang">("tunai");
+  const [metodeBayar, setMetodeBayar] = useState<"tunai" | "qris" | "hutang">("tunai");
   const [namaPelanggan, setNamaPelanggan] = useState("");
 
   const kategoriList = useMemo(() => sortKategoriList(menus.map((m) => m.kategori)), [menus]);
@@ -108,6 +108,11 @@ export function Kasir({ menus, resep, bahan }: KasirData) {
 
   async function handleSimpan() {
     if (cartItems.length === 0) return;
+    if (metodeBayar === "hutang" && !namaPelanggan.trim()) {
+      toast.error("Nama pelanggan wajib diisi untuk transaksi hutang");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch("/api/transaksi", {
@@ -124,11 +129,15 @@ export function Kasir({ menus, resep, bahan }: KasirData) {
         toast.error(json.error ?? "Gagal menyimpan transaksi");
         return;
       }
-      toast.success(metodeBayar === "hutang" ? "Transaksi hutang berhasil disimpan" : "Transaksi berhasil disimpan");
+      toast.success(
+        metodeBayar === "hutang" ? "Transaksi hutang berhasil disimpan" : "Transaksi berhasil disimpan"
+      );
       setCart({});
       setMetodeBayar("tunai");
       setNamaPelanggan("");
       router.refresh();
+    } catch {
+      toast.error("Tidak dapat menghubungi server. Coba lagi.");
     } finally {
       setSubmitting(false);
     }
@@ -244,10 +253,18 @@ export function Kasir({ menus, resep, bahan }: KasirData) {
           </div>
           <div className="flex flex-col gap-2">
             <Label>Metode Bayar</Label>
-            <Tabs value={metodeBayar} onValueChange={(v) => setMetodeBayar((v as typeof metodeBayar) ?? "tunai")}>
+            <Tabs
+              value={metodeBayar}
+              onValueChange={(value) => {
+                if (value === "tunai" || value === "qris" || value === "hutang") setMetodeBayar(value);
+              }}
+            >
               <TabsList className="w-full">
                 <TabsTrigger value="tunai" className="flex-1">
                   Tunai
+                </TabsTrigger>
+                <TabsTrigger value="qris" className="flex-1">
+                  QRIS
                 </TabsTrigger>
                 <TabsTrigger value="hutang" className="flex-1">
                   Hutang
@@ -257,21 +274,31 @@ export function Kasir({ menus, resep, bahan }: KasirData) {
           </div>
           {metodeBayar === "hutang" && (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="namaPelanggan">Nama Pelanggan (opsional)</Label>
+              <Label htmlFor="namaPelanggan">Nama Pelanggan</Label>
               <Input
                 id="namaPelanggan"
                 value={namaPelanggan}
                 onChange={(e) => setNamaPelanggan(e.target.value)}
                 placeholder="Mis. Budi"
+                required
               />
             </div>
           )}
-          <Button disabled={cartItems.length === 0 || submitting} onClick={handleSimpan}>
+          <Button
+            disabled={
+              cartItems.length === 0 ||
+              submitting ||
+              (metodeBayar === "hutang" && !namaPelanggan.trim())
+            }
+            onClick={handleSimpan}
+          >
             {submitting
               ? "Menyimpan..."
               : metodeBayar === "hutang"
                 ? "Simpan Transaksi (Hutang)"
-                : "Simpan Transaksi"}
+                : metodeBayar === "qris"
+                  ? "Simpan Transaksi (QRIS)"
+                  : "Simpan Transaksi"}
           </Button>
         </CardContent>
       </Card>

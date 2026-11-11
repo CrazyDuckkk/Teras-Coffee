@@ -33,7 +33,7 @@ function getPeriodeRange(periode: PeriodeLaporan): { start: Date; end: Date } {
  * Laporan dihitung live dari transaksi + stock_masuk (bukan tabel tersendiri, selaras
  * dengan pendekatan Keuangan). Hanya transaksi aktif (void dikecualikan).
  * - labaRugi = totalPemasukan - totalPengeluaran (periode) — angka CASH-FLOW: transaksi
- *   tunai + hutang yang dilunasi dalam periode ini (berdasar tanggal_lunas), hutang yang
+ *   tunai/QRIS + hutang yang dilunasi dalam periode ini (berdasar tanggal_lunas), hutang yang
  *   belum lunas belum dihitung. Selaras dengan modul Keuangan & Tutup Kasir.
  * - menuTerlaris/menuMargin = ranking berdasarkan SEMUA penjualan aktif periode ini
  *   (termasuk hutang yang belum lunas — barang sudah keluar, terlepas dari status bayar).
@@ -55,7 +55,7 @@ export async function getLaporan(periode: PeriodeLaporan = "harian") {
       .where(
         and(
           eq(transaksi.status, "aktif"),
-          eq(transaksi.metodeBayar, "tunai"),
+          inArray(transaksi.metodeBayar, ["tunai", "qris"]),
           gte(transaksi.tanggal, start),
           lt(transaksi.tanggal, end)
         )

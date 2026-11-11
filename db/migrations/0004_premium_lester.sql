@@ -1,0 +1,1 @@
+ALTER TYPE "public"."metode_bayar" ADD VALUE 'qris' BEFORE 'hutang';

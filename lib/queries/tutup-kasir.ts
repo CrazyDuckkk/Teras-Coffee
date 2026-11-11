@@ -21,7 +21,7 @@ export interface RingkasanHarian {
 /**
  * Ringkasan transaksi aktif + stock masuk hari ini (WIB), dihitung live (belum tersimpan).
  * totalPenjualan/labaKotor di sini adalah angka CASH-FLOW (selaras dengan "saldo" di modul
- * Keuangan): transaksi TUNAI hari ini + hutang yang dilunasi hari ini (walau transaksi
+ * Keuangan): transaksi TUNAI/QRIS hari ini + hutang yang dilunasi hari ini (walau transaksi
  * hutangnya sendiri terjadi di hari lain) — hutang yang belum lunas TIDAK ikut dihitung.
  * BEDA dari "Laba Kotor" di Dashboard yang berbasis margin per item (hargaJual - hpp) atas
  * SEMUA penjualan aktif hari ini (termasuk hutang yang belum lunas — barang sudah keluar).
@@ -47,7 +47,7 @@ async function calculateRingkasanHarian(now: Date): Promise<RingkasanHarian> {
       .where(
         and(
           eq(transaksi.status, "aktif"),
-          eq(transaksi.metodeBayar, "tunai"),
+          inArray(transaksi.metodeBayar, ["tunai", "qris"]),
           gte(transaksi.tanggal, start),
           lt(transaksi.tanggal, end)
         )
@@ -111,7 +111,7 @@ export async function getRingkasanKasir(now: Date = new Date()) {
       .where(
         and(
           eq(transaksi.status, "aktif"),
-          eq(transaksi.metodeBayar, "tunai"),
+          inArray(transaksi.metodeBayar, ["tunai", "qris"]),
           gte(transaksi.tanggal, start),
           lt(transaksi.tanggal, end),
         ),

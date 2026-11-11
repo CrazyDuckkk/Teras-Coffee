@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bahanBaku, detailTransaksi, hutang, menu, resepMenu, riwayatHargaBahan, transaksi } from "@/db/schema";
-import { getTodayRangeWIB } from "@/lib/date";
+import { bahanBaku, detailTransaksi, hutang, menu, resepMenu, riwayatHargaBahan, transaksi, user } from "@/db/schema";
+import { getRangeLastNDaysWIB } from "@/lib/date";
 import { HutangSudahLunasError } from "@/lib/queries/hutang";
 import type { TransaksiCreateInput } from "@/lib/validations/transaksi";
 import { requireRole } from "@/lib/auth-guard";
@@ -221,12 +221,13 @@ export async function voidTransaksi(id: string) {
 }
 
 /** Riwayat transaksi hari ini (WIB) — dipakai halaman Transaksi untuk daftar + aksi void. */
-export async function listTransaksiHariIni() {
+export async function listTransaksiTujuhHari() {
   await requireRole("owner", "cashier");
-  const { start, end } = getTodayRangeWIB();
+  const { start, end } = getRangeLastNDaysWIB(7);
   const rows = await db
-    .select()
+    .select({ transaksi, pelakuNama: user.name })
     .from(transaksi)
+    .leftJoin(user, eq(transaksi.pelakuId, user.id))
     .where(and(gte(transaksi.tanggal, start), lt(transaksi.tanggal, end)))
     .orderBy(desc(transaksi.tanggal));
 
@@ -245,12 +246,13 @@ export async function listTransaksiHariIni() {
     .where(
       inArray(
         detailTransaksi.transaksiId,
-        rows.map((r) => r.id)
+        rows.map((r) => r.transaksi.id)
       )
     );
 
-  return rows.map((r) => ({
-    ...r,
-    items: details.filter((d) => d.transaksiId === r.id),
+  return rows.map(({ transaksi: row, pelakuNama }) => ({
+    ...row,
+    pelakuNama,
+    items: details.filter((d) => d.transaksiId === row.id),
   }));
 }

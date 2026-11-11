@@ -57,6 +57,12 @@ Aplikasi web untuk operasional kedai kopi, dibuat dengan Next.js, Drizzle ORM, P
 - Aktivitas transaksi, Stock Masuk, dan tutup kasir menyimpan ID pelaku jika tersedia; kolom nullable menjaga catatan lama tetap valid.
 - Tabel Pengaturan menyediakan pasangan kunci/nilai beserta waktu dan pelaku perubahan.
 
+## Transaksi kasir (M3)
+
+- Pembayaran mendukung tunai, QRIS, dan hutang; transaksi hutang mewajibkan nama pelanggan.
+- Riwayat transaksi menampilkan tujuh hari terakhir dalam tab transaksi sendiri dan kasir lain.
+- Respons kasir hanya membawa nilai transaksi dan detail penjualan yang diperlukan, tidak menyertakan HPP.
+
 ## Pemeriksaan
 
 ```bash
