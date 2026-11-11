@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { detailTransaksi, hutang, menu, stockMasuk, transaksi } from "@/db/schema";
-import { getRangeLastNDaysWIB, getTodayRangeWIB } from "@/lib/date";
+import { getMonthRangeWIB, getTodayRangeWIB, getWeekRangeWIB } from "@/lib/date";
 import { requireRole } from "@/lib/auth-guard";
 
 export type PeriodeLaporan = "harian" | "mingguan" | "bulanan";
@@ -23,9 +23,9 @@ function getPeriodeRange(periode: PeriodeLaporan): { start: Date; end: Date } {
     case "harian":
       return getTodayRangeWIB();
     case "mingguan":
-      return getRangeLastNDaysWIB(7);
+      return getWeekRangeWIB();
     case "bulanan":
-      return getRangeLastNDaysWIB(30);
+      return getMonthRangeWIB();
   }
 }
 

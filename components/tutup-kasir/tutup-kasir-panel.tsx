@@ -52,6 +52,8 @@ export function TutupKasirPanel({
       toast.success("Kasir hari ini berhasil ditutup");
       setOpen(false);
       router.refresh();
+    } catch {
+      toast.error("Tidak dapat menghubungi server. Coba lagi.");
     } finally {
       setLoading(false);
     }

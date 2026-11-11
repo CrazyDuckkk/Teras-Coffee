@@ -27,6 +27,13 @@ export default async function LaporanPage({
     <div className="flex flex-col gap-6">
       <PageHeader title="Laporan" description="Laba-Rugi, Menu Terlaris, dan Menu Paling Untung/Boncos" />
       <LaporanPeriodeFilter current={periode} />
+      <p className="text-sm text-muted-foreground">
+        {periode === "harian"
+          ? "Periode hari ini menggunakan zona waktu WIB."
+          : periode === "mingguan"
+            ? "Periode mingguan berjalan dari Senin hingga Senin berikutnya (WIB)."
+            : "Periode bulanan berjalan dari tanggal 1 hingga tanggal 1 bulan berikutnya (WIB)."}
+      </p>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Total Pemasukan" value={formatRupiah(totalPemasukan)} tone="success" />
         <StatCard label="Total Pengeluaran" value={formatRupiah(totalPengeluaran)} tone="danger" />

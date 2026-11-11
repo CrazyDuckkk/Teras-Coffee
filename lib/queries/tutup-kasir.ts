@@ -166,25 +166,43 @@ export async function createTutupKasir(now: Date = new Date()) {
   await requireRole("owner", "cashier");
   const tanggal = getTodayDateStringWIB(now);
 
-  return db.transaction(async (tx) => {
-    const [existing] = await tx.select().from(tutupKasir).where(eq(tutupKasir.tanggal, tanggal)).limit(1);
-    if (existing) throw new SudahTutupKasirError();
+  try {
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx.select().from(tutupKasir).where(eq(tutupKasir.tanggal, tanggal)).limit(1);
+      if (existing) throw new SudahTutupKasirError();
 
-    const ringkasan = await calculateRingkasanHarian(now);
+      const ringkasan = await calculateRingkasanHarian(now);
 
-    const [row] = await tx
-      .insert(tutupKasir)
-      .values({
-        tanggal,
-        totalPenjualan: ringkasan.totalPenjualan.toFixed(2),
-        totalPengeluaran: ringkasan.totalPengeluaran.toFixed(2),
-        labaKotor: ringkasan.labaKotor.toFixed(2),
-        menuTerlarisId: ringkasan.menuTerlaris?.menuId ?? null,
-      })
-      .returning();
+      const [row] = await tx
+        .insert(tutupKasir)
+        .values({
+          tanggal,
+          totalPenjualan: ringkasan.totalPenjualan.toFixed(2),
+          totalPengeluaran: ringkasan.totalPengeluaran.toFixed(2),
+          labaKotor: ringkasan.labaKotor.toFixed(2),
+          menuTerlarisId: ringkasan.menuTerlaris?.menuId ?? null,
+        })
+        .returning();
 
-    return row;
-  });
+      return row;
+    });
+  } catch (error) {
+    if (isDuplicateCloseDate(error)) throw new SudahTutupKasirError();
+    throw error;
+  }
+}
+
+function isDuplicateCloseDate(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  if (
+    "code" in error &&
+    error.code === "23505" &&
+    "constraint" in error &&
+    error.constraint === "tutup_kasir_tanggal_unique"
+  ) {
+    return true;
+  }
+  return "cause" in error && error.cause !== error && isDuplicateCloseDate(error.cause);
 }
 
 /** Riwayat tutup kasir, terbaru dulu. */

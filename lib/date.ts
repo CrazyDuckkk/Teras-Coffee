@@ -26,6 +26,30 @@ export function getRangeLastNDaysWIB(n: number, now: Date = new Date()): { start
   return { start, end };
 }
 
+/** Mengembalikan rentang minggu berjalan (Senin sampai Senin berikutnya) dalam WIB. */
+export function getWeekRangeWIB(now: Date = new Date()): { start: Date; end: Date } {
+  const wibNow = new Date(now.getTime() + WIB_OFFSET_MS);
+  const year = wibNow.getUTCFullYear();
+  const month = wibNow.getUTCMonth();
+  const day = wibNow.getUTCDate();
+  const weekday = new Date(Date.UTC(year, month, day)).getUTCDay();
+  const daysSinceMonday = (weekday + 6) % 7;
+  const start = new Date(Date.UTC(year, month, day - daysSinceMonday) - WIB_OFFSET_MS);
+  const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
+  return { start, end };
+}
+
+/** Mengembalikan rentang bulan berjalan dalam WIB. */
+export function getMonthRangeWIB(now: Date = new Date()): { start: Date; end: Date } {
+  const wibNow = new Date(now.getTime() + WIB_OFFSET_MS);
+  const year = wibNow.getUTCFullYear();
+  const month = wibNow.getUTCMonth();
+  return {
+    start: new Date(Date.UTC(year, month, 1) - WIB_OFFSET_MS),
+    end: new Date(Date.UTC(year, month + 1, 1) - WIB_OFFSET_MS),
+  };
+}
+
 /** Tanggal hari ini dalam WIB sebagai string "YYYY-MM-DD" — dipakai untuk kolom `date` (mis. tutup_kasir.tanggal). */
 export function getTodayDateStringWIB(now: Date = new Date()): string {
   const wibNow = new Date(now.getTime() + WIB_OFFSET_MS);
