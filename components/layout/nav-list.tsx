@@ -3,14 +3,22 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS } from "./nav-items";
+import { getNavItemsForRole } from "./nav-items";
+import type { UserRole } from "@/lib/roles";
 
-export function NavList({ onNavigate }: { onNavigate?: () => void }) {
+export function NavList({
+  role,
+  onNavigate,
+}: {
+  role: UserRole;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
+  const navItems = getNavItemsForRole(role);
 
   return (
     <nav className="flex flex-col gap-1">
-      {NAV_ITEMS.map((item) => {
+      {navItems.map((item) => {
         const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
         const Icon = item.icon;
         return (

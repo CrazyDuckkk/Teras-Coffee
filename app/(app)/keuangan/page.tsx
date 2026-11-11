@@ -4,6 +4,7 @@ import { formatRupiah } from "@/lib/format";
 import { getKeuangan, type PeriodeKeuangan } from "@/lib/queries/keuangan";
 import { PeriodeFilter } from "@/components/keuangan/periode-filter";
 import { KeuanganList } from "@/components/keuangan/keuangan-list";
+import { requireRole } from "@/lib/auth-guard";
 
 const VALID_PERIODE: PeriodeKeuangan[] = ["hari-ini", "7-hari", "30-hari", "semua"];
 
@@ -12,6 +13,7 @@ export default async function KeuanganPage({
 }: {
   searchParams: Promise<{ periode?: string }>;
 }) {
+  await requireRole("owner");
   const { periode: periodeParam } = await searchParams;
   const periode: PeriodeKeuangan = VALID_PERIODE.includes(periodeParam as PeriodeKeuangan)
     ? (periodeParam as PeriodeKeuangan)

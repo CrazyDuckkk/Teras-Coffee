@@ -23,7 +23,13 @@ import type { listTransaksiHariIni } from "@/lib/queries/transaksi";
 
 type TransaksiRow = Awaited<ReturnType<typeof listTransaksiHariIni>>[number];
 
-export function RiwayatTransaksi({ data }: { data: TransaksiRow[] }) {
+export function RiwayatTransaksi({
+  data,
+  canVoid,
+}: {
+  data: TransaksiRow[];
+  canVoid: boolean;
+}) {
   const router = useRouter();
   const [voidTarget, setVoidTarget] = useState<TransaksiRow | null>(null);
   const [loading, setLoading] = useState(false);
@@ -75,7 +81,7 @@ export function RiwayatTransaksi({ data }: { data: TransaksiRow[] }) {
             </div>
             <div className="flex items-center gap-3">
               <Currency value={t.totalPemasukan} className="font-medium" />
-              {t.status === "aktif" && (
+              {canVoid && t.status === "aktif" && (
                 <Button variant="ghost" size="icon" aria-label="Void transaksi" onClick={() => setVoidTarget(t)}>
                   <Ban className="size-4 text-danger-foreground" />
                 </Button>

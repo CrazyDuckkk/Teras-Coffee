@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireSession } from "@/lib/auth-guard";
+import { requireApiRole } from "@/lib/auth-guard";
 import { menuInputSchema } from "@/lib/validations/menu";
 import { createMenu, listMenu } from "@/lib/queries/menu";
 
 export async function GET(request: Request) {
-  const session = await requireSession();
-  if (!session) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const access = await requireApiRole("owner");
+  if (!access.ok) return access.response;
 
   const { searchParams } = new URL(request.url);
   const includeInactive = searchParams.get("includeInactive") === "true";
@@ -15,8 +15,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await requireSession();
-  if (!session) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const access = await requireApiRole("owner");
+  if (!access.ok) return access.response;
 
   const body = await request.json();
   const parsed = menuInputSchema.safeParse(body);

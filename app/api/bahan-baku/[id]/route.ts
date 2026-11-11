@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireSession } from "@/lib/auth-guard";
+import { requireApiRole } from "@/lib/auth-guard";
 import { bahanBakuUpdateSchema } from "@/lib/validations/inventaris";
 import { BahanMasihDipakaiError, deactivateBahanBaku, getBahanBakuById, updateBahanBaku } from "@/lib/queries/inventaris";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireSession();
-  if (!session) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const access = await requireApiRole("owner");
+  if (!access.ok) return access.response;
 
   const { id } = await params;
   const row = await getBahanBakuById(id);
@@ -15,8 +15,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireSession();
-  if (!session) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const access = await requireApiRole("owner");
+  if (!access.ok) return access.response;
 
   const { id } = await params;
   const body = await request.json();
@@ -39,8 +39,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireSession();
-  if (!session) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const access = await requireApiRole("owner");
+  if (!access.ok) return access.response;
 
   const { id } = await params;
   try {

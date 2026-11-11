@@ -4,6 +4,7 @@ import { bahanBaku, detailTransaksi, hutang, menu, resepMenu, riwayatHargaBahan,
 import { getTodayRangeWIB } from "@/lib/date";
 import { HutangSudahLunasError } from "@/lib/queries/hutang";
 import type { TransaksiCreateInput } from "@/lib/validations/transaksi";
+import { requireRole } from "@/lib/auth-guard";
 
 export class StokTidakCukupError extends Error {
   constructor(public shortages: { nama: string; butuh: number; tersedia: number; satuan: string }[]) {
@@ -32,6 +33,7 @@ export class TransaksiSudahVoidError extends Error {
 
 /** Data untuk halaman kasir: menu aktif + resep per menu (dipakai validasi stok di client) + stok bahan saat ini. */
 export async function getKasirData() {
+  await requireRole("owner", "cashier");
   const [menus, resep, bahan] = await Promise.all([
     db.select().from(menu).where(eq(menu.isActive, true)).orderBy(menu.kategori, menu.nama),
     db
@@ -65,6 +67,7 @@ function hargaAktifSubquery(tx: DbOrTx) {
  * Gagal total (rollback) kalau ada bahan kurang.
  */
 export async function createTransaksi(input: TransaksiCreateInput) {
+  await requireRole("owner", "cashier");
   return db.transaction(async (tx) => {
     const menuIds = [...new Set(input.items.map((i) => i.menuId))];
 
@@ -172,6 +175,7 @@ export async function createTransaksi(input: TransaksiCreateInput) {
  * (uangnya sudah tercatat masuk di Keuangan — tidak bisa dibatalkan lewat void begitu saja).
  */
 export async function voidTransaksi(id: string) {
+  await requireRole("owner");
   return db.transaction(async (tx) => {
     const [row] = await tx.select().from(transaksi).where(eq(transaksi.id, id)).for("update");
     if (!row) return null;
@@ -214,6 +218,7 @@ export async function voidTransaksi(id: string) {
 
 /** Riwayat transaksi hari ini (WIB) — dipakai halaman Transaksi untuk daftar + aksi void. */
 export async function listTransaksiHariIni() {
+  await requireRole("owner", "cashier");
   const { start, end } = getTodayRangeWIB();
   const rows = await db
     .select()

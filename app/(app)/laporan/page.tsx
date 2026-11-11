@@ -5,6 +5,7 @@ import { getLaporan, type PeriodeLaporan } from "@/lib/queries/laporan";
 import { LaporanPeriodeFilter } from "@/components/laporan/periode-filter";
 import { MenuTerlarisRanking } from "@/components/laporan/menu-terlaris-ranking";
 import { MenuMarginRanking } from "@/components/laporan/menu-margin-ranking";
+import { requireRole } from "@/lib/auth-guard";
 
 const VALID_PERIODE: PeriodeLaporan[] = ["harian", "mingguan", "bulanan"];
 
@@ -13,6 +14,7 @@ export default async function LaporanPage({
 }: {
   searchParams: Promise<{ periode?: string }>;
 }) {
+  await requireRole("owner");
   const { periode: periodeParam } = await searchParams;
   const periode: PeriodeLaporan = VALID_PERIODE.includes(periodeParam as PeriodeLaporan)
     ? (periodeParam as PeriodeLaporan)

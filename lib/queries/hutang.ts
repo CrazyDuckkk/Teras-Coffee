@@ -1,6 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { detailTransaksi, hutang, menu } from "@/db/schema";
+import { requireRole } from "@/lib/auth-guard";
 
 export class HutangSudahLunasError extends Error {
   constructor() {
@@ -12,6 +13,7 @@ export class HutangSudahLunasError extends Error {
 export type StatusHutang = "belum_lunas" | "lunas";
 
 export async function listHutang(status?: StatusHutang) {
+  await requireRole("owner", "cashier");
   return db
     .select()
     .from(hutang)
@@ -21,6 +23,7 @@ export async function listHutang(status?: StatusHutang) {
 
 /** Detail hutang + item transaksi terkait (dipakai popup detail di halaman Hutang). */
 export async function getHutangDetail(id: string) {
+  await requireRole("owner", "cashier");
   const [row] = await db.select().from(hutang).where(eq(hutang.id, id)).limit(1);
   if (!row) return null;
 
@@ -45,6 +48,7 @@ export async function getHutangDetail(id: string) {
  * (dengan tanggal_lunas sebagai tanggal pemasukan) sejak titik ini.
  */
 export async function tandaiLunas(id: string) {
+  await requireRole("owner", "cashier");
   return db.transaction(async (tx) => {
     const [row] = await tx.select().from(hutang).where(eq(hutang.id, id)).for("update");
     if (!row) return null;

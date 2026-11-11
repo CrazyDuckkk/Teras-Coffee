@@ -1,5 +1,16 @@
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, Package, Coffee, ShoppingCart, HandCoins, Wallet, Calculator, BarChart3 } from "lucide-react";
+import {
+  BarChart3,
+  Calculator,
+  Coffee,
+  HandCoins,
+  LayoutDashboard,
+  Package,
+  Settings,
+  ShoppingCart,
+  Wallet,
+} from "lucide-react";
+import type { UserRole } from "@/lib/roles";
 
 export interface NavItem {
   href: string;
@@ -7,9 +18,7 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
-// Urutan HARUS sama dengan claude.md Bagian 4 (+ Hutang setelah Transaksi, Fitur 3) —
-// jangan hilangkan satupun menu saat collapse mobile.
-export const NAV_ITEMS: NavItem[] = [
+const OWNER_NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/inventaris", label: "Inventaris", icon: Package },
   { href: "/menu", label: "Menu", icon: Coffee },
@@ -18,4 +27,16 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/keuangan", label: "Keuangan", icon: Wallet },
   { href: "/tutup-kasir", label: "Tutup Kasir", icon: Calculator },
   { href: "/laporan", label: "Laporan", icon: BarChart3 },
+  { href: "/pengaturan/akun", label: "Pengaturan", icon: Settings },
 ];
+
+const CASHIER_NAV_ITEMS: NavItem[] = [
+  { href: "/transaksi", label: "Transaksi", icon: ShoppingCart },
+  { href: "/hutang", label: "Hutang", icon: HandCoins },
+  { href: "/inventaris", label: "Stok Bahan", icon: Package },
+  { href: "/tutup-kasir", label: "Tutup Kasir", icon: Calculator },
+];
+
+export function getNavItemsForRole(role: UserRole): NavItem[] {
+  return role === "owner" ? OWNER_NAV_ITEMS : CASHIER_NAV_ITEMS;
+}

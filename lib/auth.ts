@@ -3,6 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { db } from "@/db";
 import * as authSchema from "@/db/schema/auth";
+import { eq } from "drizzle-orm";
 
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
@@ -13,9 +14,39 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
-    // Aplikasi single-owner — TIDAK ada pendaftaran akun baru lewat endpoint publik.
-    // Akun owner dibuat lewat scripts/seed-owner.ts (lihat internalAdapter di sana).
+    // Pendaftaran publik tetap mati. Owner membuat akun kasir melalui API internal.
     disableSignUp: true,
+  },
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        required: true,
+        defaultValue: "owner",
+        input: false,
+      },
+      isActive: {
+        type: "boolean",
+        required: true,
+        defaultValue: true,
+        input: false,
+      },
+    },
+  },
+  databaseHooks: {
+    session: {
+      create: {
+        before: async (newSession) => {
+          const [account] = await db
+            .select({ isActive: authSchema.user.isActive })
+            .from(authSchema.user)
+            .where(eq(authSchema.user.id, newSession.userId))
+            .limit(1);
+
+          if (!account?.isActive) return false;
+        },
+      },
+    },
   },
   session: {
     // Sesi persistent (owner login sekali per device, tidak berulang tiap hari).

@@ -2,6 +2,7 @@ import { and, desc, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { detailTransaksi, hutang, menu, stockMasuk, transaksi, tutupKasir } from "@/db/schema";
 import { getTodayDateStringWIB, getTodayRangeWIB } from "@/lib/date";
+import { requireRole } from "@/lib/auth-guard";
 
 export class SudahTutupKasirError extends Error {
   constructor() {
@@ -28,6 +29,11 @@ export interface RingkasanHarian {
  * Field totalPenjualan/labaKotor inilah yang disimpan ke tabel tutup_kasir.
  */
 export async function getRingkasanHarian(now: Date = new Date()): Promise<RingkasanHarian> {
+  await requireRole("owner");
+  return calculateRingkasanHarian(now);
+}
+
+async function calculateRingkasanHarian(now: Date): Promise<RingkasanHarian> {
   const { start, end } = getTodayRangeWIB(now);
 
   const [transaksiHariIni, transaksiTunaiHariIni, hutangLunasHariIni, stockMasukHariIni] = await Promise.all([
@@ -94,8 +100,56 @@ export async function getRingkasanHarian(now: Date = new Date()): Promise<Ringka
   };
 }
 
+export async function getRingkasanKasir(now: Date = new Date()) {
+  await requireRole("owner", "cashier");
+  const { start, end } = getTodayRangeWIB(now);
+
+  const [tunai, hutangLunas] = await Promise.all([
+    db
+      .select({ total: transaksi.totalPemasukan })
+      .from(transaksi)
+      .where(
+        and(
+          eq(transaksi.status, "aktif"),
+          eq(transaksi.metodeBayar, "tunai"),
+          gte(transaksi.tanggal, start),
+          lt(transaksi.tanggal, end),
+        ),
+      ),
+    db
+      .select({ total: hutang.jumlah })
+      .from(hutang)
+      .where(
+        and(
+          eq(hutang.status, "lunas"),
+          isNotNull(hutang.tanggalLunas),
+          gte(hutang.tanggalLunas, start),
+          lt(hutang.tanggalLunas, end),
+        ),
+      ),
+  ]);
+
+  return {
+    totalPenjualan:
+      tunai.reduce((sum, row) => sum + Number(row.total), 0) +
+      hutangLunas.reduce((sum, row) => sum + Number(row.total), 0),
+  };
+}
+
+export async function getStatusTutupKasir(now: Date = new Date()) {
+  await requireRole("owner", "cashier");
+  const tanggal = getTodayDateStringWIB(now);
+  const [row] = await db
+    .select({ tanggal: tutupKasir.tanggal })
+    .from(tutupKasir)
+    .where(eq(tutupKasir.tanggal, tanggal))
+    .limit(1);
+  return row ?? null;
+}
+
 /** Baris tutup_kasir untuk tanggal hari ini (WIB), null kalau belum ditutup. */
 export async function getTutupKasirHariIni(now: Date = new Date()) {
+  await requireRole("owner");
   const tanggal = getTodayDateStringWIB(now);
   const [row] = await db
     .select({ tutupKasir, menuTerlarisNama: menu.nama })
@@ -109,13 +163,14 @@ export async function getTutupKasirHariIni(now: Date = new Date()) {
 
 /** Tutup kasir hari ini — snapshot ringkasan harian ke tabel tutup_kasir. Tolak kalau sudah pernah ditutup. */
 export async function createTutupKasir(now: Date = new Date()) {
+  await requireRole("owner", "cashier");
   const tanggal = getTodayDateStringWIB(now);
 
   return db.transaction(async (tx) => {
     const [existing] = await tx.select().from(tutupKasir).where(eq(tutupKasir.tanggal, tanggal)).limit(1);
     if (existing) throw new SudahTutupKasirError();
 
-    const ringkasan = await getRingkasanHarian(now);
+    const ringkasan = await calculateRingkasanHarian(now);
 
     const [row] = await tx
       .insert(tutupKasir)
@@ -134,6 +189,7 @@ export async function createTutupKasir(now: Date = new Date()) {
 
 /** Riwayat tutup kasir, terbaru dulu. */
 export async function listRiwayatTutupKasir(limit = 30) {
+  await requireRole("owner");
   const rows = await db
     .select({ tutupKasir, menuTerlarisNama: menu.nama })
     .from(tutupKasir)

@@ -2,6 +2,7 @@ import { and, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { detailTransaksi, hutang, menu, stockMasuk, transaksi } from "@/db/schema";
 import { getRangeLastNDaysWIB, getTodayRangeWIB } from "@/lib/date";
+import { requireRole } from "@/lib/auth-guard";
 
 export type PeriodeLaporan = "harian" | "mingguan" | "bulanan";
 
@@ -40,6 +41,7 @@ function getPeriodeRange(periode: PeriodeLaporan): { start: Date; end: Date } {
  *   total profit) supaya item boncos tetap terlihat walau volume penjualannya kecil.
  */
 export async function getLaporan(periode: PeriodeLaporan = "harian") {
+  await requireRole("owner");
   const { start, end } = getPeriodeRange(periode);
 
   const [transaksiRange, transaksiTunaiRange, hutangLunasRange, pengeluaranRange] = await Promise.all([

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@/lib/auth-guard";
+import { requireApiRole } from "@/lib/auth-guard";
 import { TransaksiSudahVoidError, voidTransaksi } from "@/lib/queries/transaksi";
 import { HutangSudahLunasError } from "@/lib/queries/hutang";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireSession();
-  if (!session) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const access = await requireApiRole("owner");
+  if (!access.ok) return access.response;
 
   const { id } = await params;
   try {

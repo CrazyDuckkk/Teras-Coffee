@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@/lib/auth-guard";
+import { requireApiRole } from "@/lib/auth-guard";
 import { getRiwayatHarga } from "@/lib/queries/inventaris";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await requireSession();
-  if (!session) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const access = await requireApiRole("owner");
+  if (!access.ok) return access.response;
 
   const { id } = await params;
   const data = await getRiwayatHarga(id);

@@ -2,6 +2,7 @@ import { and, eq, gte, isNotNull, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { bahanBaku, hutang, stockMasuk, transaksi } from "@/db/schema";
 import { getRangeLastNDaysWIB, getTodayRangeWIB } from "@/lib/date";
+import { requireRole } from "@/lib/auth-guard";
 
 export type PeriodeKeuangan = "hari-ini" | "7-hari" | "30-hari" | "semua";
 
@@ -34,6 +35,7 @@ export function getPeriodeRange(periode: PeriodeKeuangan): { start?: Date; end?:
  * cash-flow sama sekali — baru muncul di sini setelah ditandai lunas (lihat lib/queries/hutang.ts).
  */
 export async function getKeuangan(periode: PeriodeKeuangan = "30-hari") {
+  await requireRole("owner");
   const { start, end } = getPeriodeRange(periode);
 
   const pemasukanTunaiFilters = [eq(transaksi.status, "aktif"), eq(transaksi.metodeBayar, "tunai")];

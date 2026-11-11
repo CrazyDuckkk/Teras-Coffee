@@ -8,9 +8,7 @@ import { requireSession } from "@/lib/auth-guard";
 export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  // Lapis kedua otorisasi (defense-in-depth) — proxy.ts cuma optimistic check berbasis
-  // cookie; ini validasi sesungguhnya ke Better Auth/DB, jaring pengaman kalau proxy
-  // ter-bypass/salah matcher/ter-nonaktifkan. Menjaga ke-7 halaman di bawah layout ini sekaligus.
+  // Proxy hanya pemeriksaan cookie untuk UX; sesi dan status akun divalidasi ke DB di sini.
   const session = await requireSession();
   if (!session) {
     redirect("/login");
@@ -18,9 +16,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar />
+      <Sidebar role={session.user.role} />
       <div className="flex min-h-screen flex-1 flex-col">
-        <MobileNav />
+        <MobileNav role={session.user.role} />
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
       </div>
     </div>

@@ -1,8 +1,10 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { listHutang } from "@/lib/queries/hutang";
 import { HutangList } from "@/components/hutang/hutang-list";
+import { requireRole } from "@/lib/auth-guard";
 
 export default async function HutangPage() {
+  await requireRole("owner", "cashier");
   const data = await listHutang();
 
   return (

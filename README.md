@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Teras Coffee
 
-## Getting Started
+Aplikasi web untuk operasional kedai kopi, dibuat dengan Next.js, Drizzle ORM, PostgreSQL, dan Better Auth.
 
-First, run the development server:
+## Menjalankan aplikasi secara lokal
+
+1. Pastikan Node.js dan PostgreSQL tersedia. Jika memakai Docker yang sudah dikonfigurasi untuk project ini, jalankan:
+
+   ```bash
+   docker compose up -d
+   ```
+
+2. Salin `.env.example` menjadi `.env.local`, lalu isi konfigurasi database dan Better Auth. Isi juga `OWNER_EMAIL`, `OWNER_PASSWORD`, dan `OWNER_NAME` untuk akun owner pertama.
+
+3. Pasang dependency:
+
+   ```bash
+   npm install
+   ```
+
+4. Terapkan migrasi database:
+
+   ```bash
+   npm run db:migrate
+   ```
+
+   Pastikan `DIRECT_URL` di `.env.local` mengarah ke database lokal atau database pengujian yang memang ingin diubah.
+
+5. Buat akun owner:
+
+   ```bash
+   npm run db:seed
+   ```
+
+6. Jalankan server development:
+
+   ```bash
+   npm run dev
+   ```
+
+7. Buka [http://localhost:3000/login](http://localhost:3000/login), lalu masuk dengan email dan password owner dari `.env.local`.
+
+## Peran akun (M1)
+
+- **Owner** memiliki akses penuh, termasuk laporan, keuangan, pengelolaan menu dan inventaris, serta pengelolaan akun kasir melalui **Pengaturan Akun**.
+- **Kasir** memiliki akses operasional untuk transaksi, hutang, dan tutup kasir. Menu **Stok Bahan** terlihat di navigasi, tetapi halamannya masih berupa placeholder sampai fitur kasir inventaris dikerjakan. Akses ke halaman/API khusus owner ditolak di server.
+- Owner dapat membuat dan menonaktifkan akun kasir. Penonaktifan akun juga mencabut sesi aktif akun tersebut.
+
+## Pemeriksaan
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run typecheck
+npm run lint
+npm test
+npm run build
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

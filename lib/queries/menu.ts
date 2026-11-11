@@ -2,6 +2,7 @@ import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { bahanBaku, menu, resepMenu, riwayatHargaBahan } from "@/db/schema";
 import type { MenuInput } from "@/lib/validations/menu";
+import { requireRole } from "@/lib/auth-guard";
 
 export interface MenuWithHpp {
   id: string;
@@ -27,6 +28,7 @@ function hargaAktifSubquery() {
 
 /** HPP dihitung live dari SUM(takaran x harga_per_satuan terbaru) per bahan di resep — bukan dari snapshot transaksi. */
 export async function listMenu(includeInactive = false): Promise<MenuWithHpp[]> {
+  await requireRole("owner");
   const menus = await db
     .select()
     .from(menu)
@@ -72,6 +74,7 @@ export async function listMenu(includeInactive = false): Promise<MenuWithHpp[]> 
 
 /** Detail menu + resep, tiap baris resep disertai harga per satuan aktif untuk breakdown kontribusi HPP di popup. */
 export async function getMenuWithResep(id: string) {
+  await requireRole("owner");
   const [row] = await db.select().from(menu).where(eq(menu.id, id)).limit(1);
   if (!row) return null;
 
@@ -94,6 +97,7 @@ export async function getMenuWithResep(id: string) {
 }
 
 export async function createMenu(input: MenuInput) {
+  await requireRole("owner");
   return db.transaction(async (tx) => {
     const [row] = await tx
       .insert(menu)
@@ -117,6 +121,7 @@ export async function createMenu(input: MenuInput) {
 }
 
 export async function updateMenu(id: string, input: MenuInput) {
+  await requireRole("owner");
   return db.transaction(async (tx) => {
     const [row] = await tx
       .update(menu)
@@ -145,6 +150,7 @@ export async function updateMenu(id: string, input: MenuInput) {
 }
 
 export async function deactivateMenu(id: string) {
+  await requireRole("owner");
   const [row] = await db
     .update(menu)
     .set({ isActive: false, updatedAt: new Date() })
@@ -155,6 +161,7 @@ export async function deactivateMenu(id: string) {
 
 /** Mengaktifkan kembali menu yang sebelumnya dinonaktifkan. */
 export async function reactivateMenu(id: string) {
+  await requireRole("owner");
   const [row] = await db
     .update(menu)
     .set({ isActive: true, updatedAt: new Date() })

@@ -2,6 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { bahanBaku, menu, resepMenu, riwayatHargaBahan, stockMasuk } from "@/db/schema";
 import type { BahanBakuCreateInput, BahanBakuUpdateInput, StockMasukCreateInput } from "@/lib/validations/inventaris";
+import { requireRole } from "@/lib/auth-guard";
 
 export class BahanMasihDipakaiError extends Error {
   constructor(public menuNames: string[]) {
@@ -11,6 +12,7 @@ export class BahanMasihDipakaiError extends Error {
 }
 
 export async function listBahanBaku(includeInactive = false) {
+  await requireRole("owner");
   const hargaAktif = db
     .selectDistinctOn([riwayatHargaBahan.bahanBakuId], {
       bahanBakuId: riwayatHargaBahan.bahanBakuId,
@@ -37,11 +39,13 @@ export async function listBahanBaku(includeInactive = false) {
 }
 
 export async function getBahanBakuById(id: string) {
+  await requireRole("owner");
   const [row] = await db.select().from(bahanBaku).where(eq(bahanBaku.id, id)).limit(1);
   return row ?? null;
 }
 
 export async function getHargaAktif(bahanBakuId: string) {
+  await requireRole("owner");
   const [row] = await db
     .select()
     .from(riwayatHargaBahan)
@@ -52,6 +56,7 @@ export async function getHargaAktif(bahanBakuId: string) {
 }
 
 export async function getRiwayatHarga(bahanBakuId: string) {
+  await requireRole("owner");
   return db
     .select()
     .from(riwayatHargaBahan)
@@ -60,6 +65,7 @@ export async function getRiwayatHarga(bahanBakuId: string) {
 }
 
 export async function createBahanBaku(input: BahanBakuCreateInput) {
+  await requireRole("owner");
   // Harga per satuan dihitung dari total harga beli awal dibagi qty (mis. beli 1000ml
   // seharga Rp40.000 -> Rp40/ml) — bukan diinput langsung per satuan oleh user.
   const hargaPerSatuan = input.totalHargaBeliAwal / input.stokAwal;
@@ -83,6 +89,7 @@ export async function createBahanBaku(input: BahanBakuCreateInput) {
 }
 
 export async function updateBahanBaku(id: string, input: BahanBakuUpdateInput) {
+  await requireRole("owner");
   const [row] = await db
     .update(bahanBaku)
     .set({
@@ -98,6 +105,7 @@ export async function updateBahanBaku(id: string, input: BahanBakuUpdateInput) {
 
 /** Menonaktifkan bahan baku — ditolak (BahanMasihDipakaiError) jika masih dipakai resep menu aktif. */
 export async function deactivateBahanBaku(id: string) {
+  await requireRole("owner");
   const menuAktifTerkait = await db
     .selectDistinct({ nama: menu.nama })
     .from(resepMenu)
@@ -118,6 +126,7 @@ export async function deactivateBahanBaku(id: string) {
 
 /** Mengaktifkan kembali bahan baku yang sebelumnya dinonaktifkan. */
 export async function reactivateBahanBaku(id: string) {
+  await requireRole("owner");
   const [row] = await db
     .update(bahanBaku)
     .set({ isActive: true, updatedAt: new Date() })
@@ -133,6 +142,7 @@ export async function reactivateBahanBaku(id: string) {
  * langsung) — mis. beli 1000ml susu seharga Rp40.000 -> Harga Aktif Rp40/ml.
  */
 export async function createStockMasuk(input: StockMasukCreateInput) {
+  await requireRole("owner");
   const hargaPerSatuanBaru = input.totalHargaBeli / input.qty;
 
   return db.transaction(async (tx) => {
@@ -181,6 +191,7 @@ export async function createStockMasuk(input: StockMasukCreateInput) {
 }
 
 export async function listStockMasuk(bahanBakuId?: string) {
+  await requireRole("owner");
   return db
     .select()
     .from(stockMasuk)

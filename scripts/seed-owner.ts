@@ -37,6 +37,8 @@ async function main() {
     email: email.toLowerCase(),
     name,
     emailVerified: true,
+    role: "owner",
+    isActive: true,
   });
   await ctx.internalAdapter.linkAccount({
     userId: user.id,

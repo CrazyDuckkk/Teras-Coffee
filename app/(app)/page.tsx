@@ -7,8 +7,15 @@ import { formatRupiah } from "@/lib/format";
 import { getDashboardSummary } from "@/lib/queries/dashboard";
 import { PeringatanInventaris } from "@/components/dashboard/peringatan-inventaris";
 import { MenuTerlarisCard } from "@/components/dashboard/menu-terlaris-card";
+import { redirect } from "next/navigation";
+import { requireSession, requireRole } from "@/lib/auth-guard";
 
 export default async function DashboardPage() {
+  const session = await requireSession();
+  if (!session) redirect("/login");
+  if (session.user.role === "cashier") redirect("/transaksi");
+  await requireRole("owner");
+
   const { omzetHariIni, labaKotorHariIni, stokMenipis, menuTerlaris } = await getDashboardSummary();
 
   return (

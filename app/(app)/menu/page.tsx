@@ -3,8 +3,10 @@ import { listMenu } from "@/lib/queries/menu";
 import { listBahanBaku } from "@/lib/queries/inventaris";
 import { MenuActions } from "@/components/menu/menu-actions";
 import { MenuGrid } from "@/components/menu/menu-grid";
+import { requireRole } from "@/lib/auth-guard";
 
 export default async function MenuPage() {
+  await requireRole("owner");
   const [menuList, bahanBakuList] = await Promise.all([listMenu(true), listBahanBaku(false)]);
 
   return (

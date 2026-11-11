@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { authClient, useSession } from "@/lib/auth-client";
+import { toast } from "sonner";
 
 export function UserMenu() {
   const router = useRouter();
@@ -34,6 +35,8 @@ export function UserMenu() {
       await authClient.signOut();
       router.push("/login");
       router.refresh();
+    } catch {
+      toast.error("Tidak dapat keluar dari akun. Coba lagi.");
     } finally {
       setLoading(false);
     }

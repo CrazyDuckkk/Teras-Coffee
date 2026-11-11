@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@/lib/auth-guard";
+import { requireApiRole } from "@/lib/auth-guard";
 import { listHutang, type StatusHutang } from "@/lib/queries/hutang";
 
 export async function GET(request: Request) {
-  const session = await requireSession();
-  if (!session) return NextResponse.json({ error: "Belum login" }, { status: 401 });
+  const access = await requireApiRole("owner", "cashier");
+  if (!access.ok) return access.response;
 
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");

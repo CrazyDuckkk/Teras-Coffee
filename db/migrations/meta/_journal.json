@@ -15,6 +15,13 @@
       "when": 1783853265317,
       "tag": "0001_fitur3_hutang",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794209745685,
+      "tag": "0002_m1_user_roles",
+      "breakpoints": true
     }
   ]
 }

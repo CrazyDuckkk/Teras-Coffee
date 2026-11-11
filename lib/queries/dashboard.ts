@@ -2,6 +2,7 @@ import { and, eq, gte, inArray, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { bahanBaku, detailTransaksi, menu, transaksi } from "@/db/schema";
 import { getTodayRangeWIB } from "@/lib/date";
+import { requireRole } from "@/lib/auth-guard";
 
 /**
  * "Laba kotor" di sini = margin penjualan hari ini: SUM((harga_jual_saat_itu - hpp_saat_itu) x qty)
@@ -9,6 +10,7 @@ import { getTodayRangeWIB } from "@/lib/date";
  * yang ikut memotong pembelian stok) — jangan disamakan.
  */
 export async function getDashboardSummary() {
+  await requireRole("owner");
   const { start, end } = getTodayRangeWIB();
 
   const transaksiHariIni = await db
