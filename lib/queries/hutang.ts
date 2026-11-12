@@ -31,6 +31,7 @@ export async function getHutangDetail(id: string) {
     .select({
       menuId: detailTransaksi.menuId,
       qty: detailTransaksi.qty,
+      bawaPulang: detailTransaksi.bawaPulang,
       hargaJualSaatItu: detailTransaksi.hargaJualSaatItu,
       menuNama: menu.nama,
     })

@@ -4,6 +4,7 @@ import { normalizeKategori } from "@/lib/format";
 export const resepItemSchema = z.object({
   bahanBakuId: z.string().uuid("Bahan baku tidak valid"),
   takaran: z.coerce.number().positive("Takaran harus lebih dari 0"),
+  hanyaBawaPulang: z.boolean().default(false),
 });
 
 export const menuInputSchema = z

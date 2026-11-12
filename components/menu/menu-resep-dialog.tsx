@@ -22,9 +22,6 @@ export function MenuResepDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const hpp = menu.hpp;
-  const untung = menu.untung;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
@@ -37,23 +34,42 @@ export function MenuResepDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
+          <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Harga Jual</span>
               <Currency value={menu.hargaJual} className="font-semibold" />
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">HPP</span>
-              <Currency value={hpp} />
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between text-sm font-medium">
-              <span>Untung</span>
-              <Currency
-                value={untung}
-                className={cn("font-semibold", untung >= 0 ? "text-success-foreground" : "text-danger-foreground")}
-              />
-            </div>
+            {[
+              {
+                label: "Makan di tempat",
+                hpp: menu.hppMakanDiTempat,
+                margin: menu.untungMakanDiTempat,
+              },
+              {
+                label: "Bawa pulang",
+                hpp: menu.hppBawaPulang,
+                margin: menu.untungBawaPulang,
+              },
+            ].map((portion) => (
+              <div key={portion.label} className="flex flex-col gap-1">
+                <p className="text-xs font-medium text-muted-foreground">{portion.label}</p>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">HPP</span>
+                  <Currency value={portion.hpp} />
+                </div>
+                <div className="flex items-center justify-between text-sm font-medium">
+                  <span>Margin</span>
+                  <Currency
+                    value={portion.margin}
+                    className={cn(
+                      "font-semibold",
+                      portion.margin >= 0 ? "text-success-foreground" : "text-danger-foreground"
+                    )}
+                  />
+                </div>
+                {portion.label === "Makan di tempat" && <Separator />}
+              </div>
+            ))}
           </div>
 
           <div className="flex flex-col gap-2">
@@ -66,14 +82,17 @@ export function MenuResepDialog({
               <div className="flex flex-col gap-2">
                 {detail.resep.map((r) => {
                   const subtotal = Number(r.takaran) * Number(r.hargaPerSatuan ?? 0);
-                  const persen = hpp > 0 ? (subtotal / hpp) * 100 : 0;
+                  const dineInSubtotal = r.hanyaBawaPulang ? 0 : subtotal;
+                  const dineInPercent =
+                    menu.hppMakanDiTempat > 0 ? (dineInSubtotal / menu.hppMakanDiTempat) * 100 : 0;
+                  const takeawayPercent = menu.hppBawaPulang > 0 ? (subtotal / menu.hppBawaPulang) * 100 : 0;
                   return (
                     <div key={r.id} className="flex flex-col gap-1 rounded-lg border border-border px-3 py-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium">{r.bahanNama}</span>
                         <Currency value={subtotal} className="font-medium" />
                       </div>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-muted-foreground">
                         <span>
                           {Number(r.takaran).toLocaleString("id-ID")} {r.satuan}
                           {r.hargaPerSatuan ? (
@@ -85,7 +104,11 @@ export function MenuResepDialog({
                             " (belum ada riwayat harga)"
                           )}
                         </span>
-                        <span>{persen.toFixed(0)}% dari HPP</span>
+                        <span>{r.hanyaBawaPulang ? "Khusus bawa pulang" : "Selalu dipakai"}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Makan di tempat: {dineInPercent.toFixed(0)}%</span>
+                        <span>Bawa pulang: {takeawayPercent.toFixed(0)}%</span>
                       </div>
                     </div>
                   );

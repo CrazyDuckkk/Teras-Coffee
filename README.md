@@ -63,6 +63,12 @@ Aplikasi web untuk operasional kedai kopi, dibuat dengan Next.js, Drizzle ORM, P
 - Riwayat transaksi menampilkan tujuh hari terakhir dalam tab transaksi sendiri dan kasir lain.
 - Respons kasir hanya membawa nilai transaksi dan detail penjualan yang diperlukan, tidak menyertakan HPP.
 
+## Bawa pulang dan kemasan (M4)
+
+- Setiap item transaksi dapat ditandai makan di tempat atau bawa pulang; pilihan bawaan adalah makan di tempat.
+- Resep dapat menandai bahan yang hanya dipakai untuk bawa pulang. Pilihan ini memengaruhi stok terpakai dan snapshot HPP transaksi.
+- Menu menampilkan HPP dan margin terpisah untuk kedua pilihan. Void mengembalikan stok dari snapshot pemakaian saat penjualan, bukan dari resep yang mungkin sudah berubah.
+
 ## Pemeriksaan
 
 ```bash

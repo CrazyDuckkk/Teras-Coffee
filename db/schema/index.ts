@@ -4,6 +4,7 @@ export * from "./menu";
 export * from "./resep-menu";
 export * from "./transaksi";
 export * from "./detail-transaksi";
+export * from "./detail-transaksi-bahan";
 export * from "./stock-masuk";
 export * from "./tutup-kasir";
 export * from "./hutang";

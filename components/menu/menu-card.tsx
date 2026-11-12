@@ -103,8 +103,6 @@ export function MenuCard({ menu, bahanBaku }: { menu: MenuWithHpp; bahanBaku: Ba
     }
   }
 
-  const untung = menu.untung;
-
   return (
     <Card className="gap-3 rounded-xl border-[#E2E8F0] shadow-[0px_1px_3px_rgba(0,0,0,0.05)] transition-shadow hover:shadow-md">
       {/* Wrapper terpisah (bukan onClick di Card) supaya Dialog/AlertDialog di bawah — walau
@@ -166,16 +164,39 @@ export function MenuCard({ menu, bahanBaku }: { menu: MenuWithHpp; bahanBaku: Ba
             <span className="text-muted-foreground">Harga Jual</span>
             <Currency value={menu.hargaJual} className="text-base font-semibold" />
           </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">HPP</span>
-            <Currency value={menu.hpp} className="text-base" />
+          <div className="rounded-lg bg-muted/40 p-2.5">
+            <p className="mb-1.5 text-xs font-medium text-muted-foreground">Makan di tempat</p>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">HPP</span>
+              <Currency value={menu.hppMakanDiTempat} />
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Margin</span>
+              <Currency
+                value={menu.untungMakanDiTempat}
+                className={cn(
+                  "font-semibold",
+                  menu.untungMakanDiTempat >= 0 ? "text-success-foreground" : "text-danger-foreground"
+                )}
+              />
+            </div>
           </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Untung</span>
-            <Currency
-              value={untung}
-              className={cn("text-base font-semibold", untung >= 0 ? "text-success-foreground" : "text-danger-foreground")}
-            />
+          <div className="rounded-lg bg-muted/40 p-2.5">
+            <p className="mb-1.5 text-xs font-medium text-muted-foreground">Bawa pulang</p>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">HPP</span>
+              <Currency value={menu.hppBawaPulang} />
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Margin</span>
+              <Currency
+                value={menu.untungBawaPulang}
+                className={cn(
+                  "font-semibold",
+                  menu.untungBawaPulang >= 0 ? "text-success-foreground" : "text-danger-foreground"
+                )}
+              />
+            </div>
           </div>
         </CardContent>
       </div>

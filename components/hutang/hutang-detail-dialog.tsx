@@ -49,6 +49,7 @@ export function HutangDetailDialog({
                   <div key={idx} className="flex items-center justify-between text-sm">
                     <span>
                       {item.menuNama} x{item.qty}
+                      {item.bawaPulang && <span className="text-muted-foreground"> · Bawa pulang</span>}
                     </span>
                     <Currency value={Number(item.hargaJualSaatItu) * item.qty} />
                   </div>

@@ -87,7 +87,9 @@ export function RiwayatTransaksi({
                   </Badge>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {t.items.map((i) => `${i.menuNama} x${i.qty}`).join(", ")}
+                  {t.items
+                    .map((i) => `${i.menuNama} x${i.qty}${i.bawaPulang ? " (bawa pulang)" : ""}`)
+                    .join(", ")}
                 </span>
                 {t.pelakuId !== currentUserId && (
                   <span className="text-xs text-muted-foreground">

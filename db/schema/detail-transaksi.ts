@@ -1,4 +1,4 @@
-import { check, index, integer, numeric, pgTable, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, numeric, pgTable, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { transaksi } from "./transaksi";
 import { menu } from "./menu";
@@ -17,6 +17,7 @@ export const detailTransaksi = pgTable(
     // Snapshot — JANGAN dihitung ulang dari tabel menu/riwayat_harga_bahan saat menampilkan riwayat transaksi lama
     hargaJualSaatItu: numeric("harga_jual_saat_itu", { precision: 12, scale: 2 }).notNull(),
     hppSaatItu: numeric("hpp_saat_itu", { precision: 12, scale: 2 }).notNull(),
+    bawaPulang: boolean("bawa_pulang").notNull().default(false),
   },
   (table) => [
     index("detail_transaksi_transaksi_idx").on(table.transaksiId),

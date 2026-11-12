@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { bahanBaku, menu, resepMenu, riwayatHargaBahan } from "@/db/schema";
 import type { MenuInput } from "@/lib/validations/menu";
 import { requireRole } from "@/lib/auth-guard";
+import { calculateRecipeHpp } from "@/lib/transaction-recipes";
 
 export interface MenuWithHpp {
   id: string;
@@ -10,8 +11,10 @@ export interface MenuWithHpp {
   kategori: string;
   hargaJual: string;
   isActive: boolean;
-  hpp: number;
-  untung: number;
+  hppMakanDiTempat: number;
+  hppBawaPulang: number;
+  untungMakanDiTempat: number;
+  untungBawaPulang: number;
   jumlahBahan: number;
 }
 
@@ -41,7 +44,9 @@ export async function listMenu(includeInactive = false): Promise<MenuWithHpp[]> 
   const resepRows = await db
     .select({
       menuId: resepMenu.menuId,
+      bahanBakuId: resepMenu.bahanBakuId,
       takaran: resepMenu.takaran,
+      hanyaBawaPulang: resepMenu.hanyaBawaPulang,
       hargaPerSatuan: hargaAktif.hargaPerSatuan,
     })
     .from(resepMenu)
@@ -53,20 +58,21 @@ export async function listMenu(includeInactive = false): Promise<MenuWithHpp[]> 
       )
     );
 
-  const hppMap = new Map<string, number>();
   const countMap = new Map<string, number>();
+  const prices = new Map(resepRows.map((recipe) => [recipe.bahanBakuId, recipe.hargaPerSatuan ?? 0]));
   for (const r of resepRows) {
-    const cost = Number(r.takaran) * Number(r.hargaPerSatuan ?? 0);
-    hppMap.set(r.menuId, (hppMap.get(r.menuId) ?? 0) + cost);
     countMap.set(r.menuId, (countMap.get(r.menuId) ?? 0) + 1);
   }
 
   return menus.map((m) => {
-    const hpp = hppMap.get(m.id) ?? 0;
+    const hppMakanDiTempat = calculateRecipeHpp(m.id, resepRows, prices, false);
+    const hppBawaPulang = calculateRecipeHpp(m.id, resepRows, prices, true);
     return {
       ...m,
-      hpp,
-      untung: Number(m.hargaJual) - hpp,
+      hppMakanDiTempat,
+      hppBawaPulang,
+      untungMakanDiTempat: Number(m.hargaJual) - hppMakanDiTempat,
+      untungBawaPulang: Number(m.hargaJual) - hppBawaPulang,
       jumlahBahan: countMap.get(m.id) ?? 0,
     };
   });
@@ -84,6 +90,7 @@ export async function getMenuWithResep(id: string) {
       id: resepMenu.id,
       bahanBakuId: resepMenu.bahanBakuId,
       takaran: resepMenu.takaran,
+      hanyaBawaPulang: resepMenu.hanyaBawaPulang,
       bahanNama: bahanBaku.nama,
       satuan: bahanBaku.satuan,
       hargaPerSatuan: hargaAktif.hargaPerSatuan,
@@ -113,6 +120,7 @@ export async function createMenu(input: MenuInput) {
         menuId: row.id,
         bahanBakuId: r.bahanBakuId,
         takaran: String(r.takaran),
+        hanyaBawaPulang: r.hanyaBawaPulang,
       }))
     );
 
@@ -142,6 +150,7 @@ export async function updateMenu(id: string, input: MenuInput) {
         menuId: id,
         bahanBakuId: r.bahanBakuId,
         takaran: String(r.takaran),
+        hanyaBawaPulang: r.hanyaBawaPulang,
       }))
     );
 

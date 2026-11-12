@@ -1,10 +1,26 @@
 import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bahanBaku, detailTransaksi, hutang, menu, resepMenu, riwayatHargaBahan, transaksi, user } from "@/db/schema";
+import {
+  bahanBaku,
+  detailTransaksi,
+  detailTransaksiBahan,
+  hutang,
+  menu,
+  resepMenu,
+  riwayatHargaBahan,
+  transaksi,
+  user,
+} from "@/db/schema";
 import { getRangeLastNDaysWIB } from "@/lib/date";
 import { HutangSudahLunasError } from "@/lib/queries/hutang";
 import type { TransaksiCreateInput } from "@/lib/validations/transaksi";
 import { requireRole } from "@/lib/auth-guard";
+import {
+  aggregateConsumptionSnapshots,
+  calculateRecipeHpp,
+  getRecipeConsumptionSnapshots,
+  getRequiredIngredients,
+} from "@/lib/transaction-recipes";
 
 export class StokTidakCukupError extends Error {
   constructor(public shortages: { nama: string; butuh: number; tersedia: number; satuan: string }[]) {
@@ -37,7 +53,12 @@ export async function getKasirData() {
   const [menus, resep, bahan] = await Promise.all([
     db.select().from(menu).where(eq(menu.isActive, true)).orderBy(menu.kategori, menu.nama),
     db
-      .select({ menuId: resepMenu.menuId, bahanBakuId: resepMenu.bahanBakuId, takaran: resepMenu.takaran })
+      .select({
+        menuId: resepMenu.menuId,
+        bahanBakuId: resepMenu.bahanBakuId,
+        takaran: resepMenu.takaran,
+        hanyaBawaPulang: resepMenu.hanyaBawaPulang,
+      })
       .from(resepMenu)
       .innerJoin(menu, eq(menu.id, resepMenu.menuId))
       .where(eq(menu.isActive, true)),
@@ -83,22 +104,16 @@ export async function createTransaksi(input: TransaksiCreateInput, pelakuId: str
       .from(resepMenu)
       .where(inArray(resepMenu.menuId, menuIds));
 
-    const requiredByBahan = new Map<string, number>();
-    for (const item of input.items) {
-      for (const r of resepRows.filter((row) => row.menuId === item.menuId)) {
-        const need = Number(r.takaran) * item.qty;
-        requiredByBahan.set(r.bahanBakuId, (requiredByBahan.get(r.bahanBakuId) ?? 0) + need);
-      }
-    }
+    const requiredByBahan = getRequiredIngredients(input.items, resepRows);
 
-    const bahanIds = [...requiredByBahan.keys()];
+    const bahanIds = requiredByBahan.map((r) => r.bahanBakuId);
     const bahanRows = bahanIds.length
       ? await tx.select().from(bahanBaku).where(inArray(bahanBaku.id, bahanIds)).for("update")
       : [];
     const bahanMap = new Map(bahanRows.map((b) => [b.id, b]));
 
     const shortages: { nama: string; butuh: number; tersedia: number; satuan: string }[] = [];
-    for (const [bahanBakuId, need] of requiredByBahan) {
+    for (const { bahanBakuId, qtyDipakai: need } of requiredByBahan) {
       const b = bahanMap.get(bahanBakuId);
       const tersedia = b ? Number(b.stokSaatIni) : 0;
       if (tersedia < need) {
@@ -109,7 +124,7 @@ export async function createTransaksi(input: TransaksiCreateInput, pelakuId: str
       throw new StokTidakCukupError(shortages);
     }
 
-    for (const [bahanBakuId, need] of requiredByBahan) {
+    for (const { bahanBakuId, qtyDipakai: need } of requiredByBahan) {
       await tx
         .update(bahanBaku)
         .set({ stokSaatIni: sql`${bahanBaku.stokSaatIni} - ${need}`, updatedAt: new Date() })
@@ -120,28 +135,29 @@ export async function createTransaksi(input: TransaksiCreateInput, pelakuId: str
     const resepWithHarga = await tx
       .select({
         menuId: resepMenu.menuId,
+        bahanBakuId: resepMenu.bahanBakuId,
         takaran: resepMenu.takaran,
+        hanyaBawaPulang: resepMenu.hanyaBawaPulang,
         hargaPerSatuan: hargaAktif.hargaPerSatuan,
       })
       .from(resepMenu)
       .leftJoin(hargaAktif, eq(hargaAktif.bahanBakuId, resepMenu.bahanBakuId))
       .where(inArray(resepMenu.menuId, menuIds));
 
-    const hppByMenu = new Map<string, number>();
-    for (const r of resepWithHarga) {
-      const cost = Number(r.takaran) * Number(r.hargaPerSatuan ?? 0);
-      hppByMenu.set(r.menuId, (hppByMenu.get(r.menuId) ?? 0) + cost);
-    }
+    const hargaByBahan = new Map(
+      resepWithHarga.map((recipe) => [recipe.bahanBakuId, recipe.hargaPerSatuan ?? 0])
+    );
 
     let totalPemasukan = 0;
     const detailValues = input.items.map((item) => {
       const m = menuMap.get(item.menuId)!;
       const hargaJualSaatItu = Number(m.hargaJual);
-      const hppSaatItu = hppByMenu.get(item.menuId) ?? 0;
+      const hppSaatItu = calculateRecipeHpp(item.menuId, resepWithHarga, hargaByBahan, item.bawaPulang);
       totalPemasukan += hargaJualSaatItu * item.qty;
       return {
         menuId: item.menuId,
         qty: item.qty,
+        bawaPulang: item.bawaPulang,
         hargaJualSaatItu: hargaJualSaatItu.toFixed(2),
         hppSaatItu: hppSaatItu.toFixed(2),
       };
@@ -156,7 +172,23 @@ export async function createTransaksi(input: TransaksiCreateInput, pelakuId: str
       })
       .returning();
 
-    await tx.insert(detailTransaksi).values(detailValues.map((d) => ({ ...d, transaksiId: row.id })));
+    for (let index = 0; index < detailValues.length; index += 1) {
+      const detailValue = detailValues[index];
+      const [detailRow] = await tx
+        .insert(detailTransaksi)
+        .values({ ...detailValue, transaksiId: row.id })
+        .returning();
+      const snapshots = getRecipeConsumptionSnapshots(input.items[index], resepRows);
+      if (snapshots.length > 0) {
+        await tx.insert(detailTransaksiBahan).values(
+          snapshots.map((snapshot) => ({
+            detailTransaksiId: detailRow.id,
+            bahanBakuId: snapshot.bahanBakuId,
+            qtyDipakai: snapshot.qtyDipakai.toFixed(2),
+          }))
+        );
+      }
+    }
 
     // Hutang belum masuk Keuangan sampai ditandai lunas (lihat lib/queries/hutang.ts) — stok
     // sudah dipotong di atas seperti biasa, barang sudah keluar terlepas dari metode bayar.
@@ -173,8 +205,8 @@ export async function createTransaksi(input: TransaksiCreateInput, pelakuId: str
 }
 
 /**
- * Void transaksi — lock row, tolak jika sudah void, kembalikan stok bahan sesuai resep saat
- * transaksi dibuat. Kalau transaksi ini berasal dari Hutang: hutang yang belum lunas ikut
+ * Void transaksi — lock row, tolak jika sudah void, dan kembalikan stok bahan sesuai snapshot
+ * pemakaian saat transaksi dibuat. Kalau transaksi ini berasal dari Hutang: hutang yang belum lunas ikut
  * dihapus (piutang batal karena transaksinya batal); hutang yang sudah lunas menolak void
  * (uangnya sudah tercatat masuk di Keuangan — tidak bisa dibatalkan lewat void begitu saja).
  */
@@ -192,18 +224,18 @@ export async function voidTransaksi(id: string) {
     }
 
     const details = await tx.select().from(detailTransaksi).where(eq(detailTransaksi.transaksiId, id));
-    const menuIds = [...new Set(details.map((d) => d.menuId))];
-    const resepRows = menuIds.length ? await tx.select().from(resepMenu).where(inArray(resepMenu.menuId, menuIds)) : [];
+    const snapshots = details.length
+      ? await tx
+          .select({
+            bahanBakuId: detailTransaksiBahan.bahanBakuId,
+            qtyDipakai: detailTransaksiBahan.qtyDipakai,
+          })
+          .from(detailTransaksiBahan)
+          .where(inArray(detailTransaksiBahan.detailTransaksiId, details.map((d) => d.id)))
+      : [];
+    const restoreByBahan = aggregateConsumptionSnapshots(snapshots);
 
-    const restoreByBahan = new Map<string, number>();
-    for (const d of details) {
-      for (const r of resepRows.filter((row2) => row2.menuId === d.menuId)) {
-        const amount = Number(r.takaran) * d.qty;
-        restoreByBahan.set(r.bahanBakuId, (restoreByBahan.get(r.bahanBakuId) ?? 0) + amount);
-      }
-    }
-
-    for (const [bahanBakuId, amount] of restoreByBahan) {
+    for (const { bahanBakuId, qtyDipakai: amount } of restoreByBahan) {
       await tx
         .update(bahanBaku)
         .set({ stokSaatIni: sql`${bahanBaku.stokSaatIni} + ${amount}`, updatedAt: new Date() })
@@ -238,6 +270,7 @@ export async function listTransaksiTujuhHari() {
       transaksiId: detailTransaksi.transaksiId,
       menuId: detailTransaksi.menuId,
       qty: detailTransaksi.qty,
+      bawaPulang: detailTransaksi.bawaPulang,
       hargaJualSaatItu: detailTransaksi.hargaJualSaatItu,
       menuNama: menu.nama,
     })

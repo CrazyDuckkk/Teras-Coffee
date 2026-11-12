@@ -13,14 +13,17 @@ import { Input } from "@/components/ui/input";
 import { Currency } from "@/components/shared/currency";
 import { formatKategori, sortKategoriList } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getRequiredIngredients } from "@/lib/transaction-recipes";
 import type { getKasirData } from "@/lib/queries/transaksi";
 
 type KasirData = Awaited<ReturnType<typeof getKasirData>>;
 type MenuRow = KasirData["menus"][number];
+type CartLine = { qty: number; bawaPulang: boolean };
+type CartItem = { menu: MenuRow; qty: number; bawaPulang: boolean };
 
 export function Kasir({ menus, resep, bahan }: KasirData) {
   const router = useRouter();
-  const [cart, setCart] = useState<Record<string, number>>({});
+  const [cart, setCart] = useState<Record<string, CartLine>>({});
   const [submitting, setSubmitting] = useState(false);
   const [metodeBayar, setMetodeBayar] = useState<"tunai" | "qris" | "hutang">("tunai");
   const [namaPelanggan, setNamaPelanggan] = useState("");
@@ -28,37 +31,43 @@ export function Kasir({ menus, resep, bahan }: KasirData) {
   const kategoriList = useMemo(() => sortKategoriList(menus.map((m) => m.kategori)), [menus]);
   const [activeKategori, setActiveKategori] = useState("semua");
 
-  const resepByMenu = useMemo(() => {
-    const map = new Map<string, typeof resep>();
-    for (const r of resep) {
-      const list = map.get(r.menuId) ?? [];
-      list.push(r);
-      map.set(r.menuId, list);
-    }
-    return map;
-  }, [resep]);
-
   const bahanMap = useMemo(() => new Map(bahan.map((b) => [b.id, b])), [bahan]);
 
+  function getCurrentItems(currentCart = cart) {
+    return Object.entries(currentCart).map(([menuId, line]) => ({
+      menuId,
+      qty: line.qty,
+      bawaPulang: line.bawaPulang,
+    }));
+  }
+
+  function getShortages(items: { menuId: string; qty: number; bawaPulang: boolean }[]) {
+    return getRequiredIngredients(items, resep).flatMap(({ bahanBakuId, qtyDipakai }) => {
+      const ingredient = bahanMap.get(bahanBakuId);
+      const available = ingredient ? Number(ingredient.stokSaatIni) : 0;
+      return qtyDipakai > available
+        ? [{ nama: ingredient?.nama ?? "Bahan", butuh: qtyDipakai, tersedia: available }]
+        : [];
+    });
+  }
+
   /** Berapa qty tambahan menu ini yang masih bisa ditambahkan tanpa melebihi stok bahan (akumulasi lintas cart). */
-  function getMaxAddableQty(menuId: string): number {
-    const resepMenu = resepByMenu.get(menuId) ?? [];
-    if (resepMenu.length === 0) return Infinity;
+  function getMaxAddableQty(menuId: string, bawaPulang = cart[menuId]?.bawaPulang ?? false): number {
+    const requiredForOne = getRequiredIngredients([{ menuId, qty: 1, bawaPulang }], resep);
+    if (requiredForOne.length === 0) return Infinity;
 
     let max = Infinity;
-    for (const r of resepMenu) {
-      const b = bahanMap.get(r.bahanBakuId);
-      const stok = b ? Number(b.stokSaatIni) : 0;
-
-      let used = 0;
-      for (const [mId, qty] of Object.entries(cart)) {
-        for (const rr of resepByMenu.get(mId) ?? []) {
-          if (rr.bahanBakuId === r.bahanBakuId) used += Number(rr.takaran) * qty;
-        }
-      }
-
-      const takaran = Number(r.takaran);
-      const maxForBahan = takaran > 0 ? Math.floor((stok - used) / takaran) : Infinity;
+    const usedByBahan = new Map(
+      getRequiredIngredients(getCurrentItems(), resep).map((item) => [item.bahanBakuId, item.qtyDipakai])
+    );
+    for (const requirement of requiredForOne) {
+      const ingredient = bahanMap.get(requirement.bahanBakuId);
+      const stock = ingredient ? Number(ingredient.stokSaatIni) : 0;
+      const used = usedByBahan.get(requirement.bahanBakuId) ?? 0;
+      const maxForBahan =
+        requirement.qtyDipakai > 0
+          ? Math.floor((stock - used) / requirement.qtyDipakai)
+          : Infinity;
       max = Math.min(max, maxForBahan);
     }
     return Math.max(0, max);
@@ -71,17 +80,23 @@ export function Kasir({ menus, resep, bahan }: KasirData) {
       if (maxAddable <= 0) return;
       amount = maxAddable;
     }
-    setCart((prev) => ({ ...prev, [menuId]: (prev[menuId] ?? 0) + amount }));
+    setCart((prev) => ({
+      ...prev,
+      [menuId]: {
+        qty: (prev[menuId]?.qty ?? 0) + amount,
+        bawaPulang: prev[menuId]?.bawaPulang ?? false,
+      },
+    }));
   }
 
   function decreaseQty(menuId: string) {
     setCart((prev) => {
       const next = { ...prev };
-      const current = next[menuId] ?? 0;
+      const current = next[menuId]?.qty ?? 0;
       if (current <= 1) {
         delete next[menuId];
       } else {
-        next[menuId] = current - 1;
+        next[menuId] = { ...next[menuId], qty: current - 1 };
       }
       return next;
     });
@@ -95,12 +110,41 @@ export function Kasir({ menus, resep, bahan }: KasirData) {
     });
   }
 
+  function setItemTakeaway(menuId: string, bawaPulang: boolean) {
+    const currentLine = cart[menuId];
+    if (!currentLine) return;
+    const proposedCart = {
+      ...cart,
+      [menuId]: { ...currentLine, bawaPulang },
+    };
+    const shortages = getShortages(getCurrentItems(proposedCart));
+    if (shortages.length > 0) {
+      toast.warning(`Stok ${shortages[0].nama} tidak cukup untuk pilihan bawa pulang`);
+      return;
+    }
+    setCart(proposedCart);
+  }
+
+  function setAllTakeaway(bawaPulang: boolean) {
+    const proposedCart = Object.fromEntries(
+      Object.entries(cart).map(([menuId, line]) => [menuId, { ...line, bawaPulang }])
+    );
+    const shortages = getShortages(getCurrentItems(proposedCart));
+    if (shortages.length > 0) {
+      toast.warning(`Stok ${shortages[0].nama} tidak cukup untuk semua item bawa pulang`);
+      return;
+    }
+    setCart(proposedCart);
+  }
+
   const cartItems = Object.entries(cart)
-    .map(([menuId, qty]) => {
+    .map(([menuId, line]) => {
       const m = menus.find((menu) => menu.id === menuId);
-      return m ? { menu: m, qty } : null;
+      return m ? { menu: m, qty: line.qty, bawaPulang: line.bawaPulang } : null;
     })
-    .filter((x): x is { menu: MenuRow; qty: number } => x !== null);
+    .filter((x): x is CartItem => x !== null);
+
+  const semuaBawaPulang = cartItems.length > 0 && cartItems.every((item) => item.bawaPulang);
 
   const total = cartItems.reduce((sum, item) => sum + Number(item.menu.hargaJual) * item.qty, 0);
 
@@ -119,7 +163,7 @@ export function Kasir({ menus, resep, bahan }: KasirData) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: cartItems.map((i) => ({ menuId: i.menu.id, qty: i.qty })),
+          items: cartItems.map((i) => ({ menuId: i.menu.id, qty: i.qty, bawaPulang: i.bawaPulang })),
           metodeBayar,
           namaPelanggan: metodeBayar === "hutang" && namaPelanggan.trim() ? namaPelanggan.trim() : undefined,
         }),
@@ -164,7 +208,7 @@ export function Kasir({ menus, resep, bahan }: KasirData) {
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {filteredMenus.map((m) => {
-              const qty = cart[m.id] ?? 0;
+              const qty = cart[m.id]?.qty ?? 0;
               const maxAddable = getMaxAddableQty(m.id);
               const habis = maxAddable <= 0 && qty === 0;
               return (
@@ -223,24 +267,57 @@ export function Kasir({ menus, resep, bahan }: KasirData) {
       <Card className="h-fit rounded-xl border-[#E2E8F0] shadow-[0px_1px_3px_rgba(0,0,0,0.05)] lg:sticky lg:top-6">
         <CardContent className="flex flex-col gap-3">
           <h2 className="font-medium">Ringkasan Pesanan</h2>
+          {cartItems.length > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              variant={semuaBawaPulang ? "default" : "outline"}
+              aria-pressed={semuaBawaPulang}
+              onClick={() => setAllTakeaway(!semuaBawaPulang)}
+            >
+              {semuaBawaPulang ? "Semua bawa pulang" : "Jadikan semua bawa pulang"}
+            </Button>
+          )}
           <Separator />
           {cartItems.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">Belum ada item dipilih.</p>
           ) : (
             <div className="flex flex-col gap-3">
               {cartItems.map((item) => (
-                <div key={item.menu.id} className="flex items-center justify-between gap-2 text-sm">
-                  <div className="flex flex-col">
-                    <span className="font-medium">{item.menu.nama}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {item.qty} x <Currency value={item.menu.hargaJual} />
-                    </span>
+                <div key={item.menu.id} className="flex flex-col gap-2 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex flex-col">
+                      <span className="font-medium">{item.menu.nama}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {item.qty} x <Currency value={item.menu.hargaJual} />
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Currency value={Number(item.menu.hargaJual) * item.qty} className="font-medium" />
+                      <button type="button" aria-label="Hapus dari keranjang" onClick={() => removeItem(item.menu.id)}>
+                        <Trash2 className="size-4 text-muted-foreground" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Currency value={Number(item.menu.hargaJual) * item.qty} className="font-medium" />
-                    <button type="button" aria-label="Hapus dari keranjang" onClick={() => removeItem(item.menu.id)}>
-                      <Trash2 className="size-4 text-muted-foreground" />
-                    </button>
+                  <div className="grid grid-cols-2 gap-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={!item.bawaPulang ? "secondary" : "outline"}
+                      aria-pressed={!item.bawaPulang}
+                      onClick={() => setItemTakeaway(item.menu.id, false)}
+                    >
+                      Makan di tempat
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={item.bawaPulang ? "secondary" : "outline"}
+                      aria-pressed={item.bawaPulang}
+                      onClick={() => setItemTakeaway(item.menu.id, true)}
+                    >
+                      Bawa pulang
+                    </Button>
                   </div>
                 </div>
               ))}

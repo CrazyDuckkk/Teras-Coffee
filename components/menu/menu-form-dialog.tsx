@@ -19,6 +19,7 @@ type MenuWithResep = NonNullable<Awaited<ReturnType<typeof getMenuWithResep>>>;
 interface ResepRow {
   bahanBakuId: string;
   takaran: string;
+  hanyaBawaPulang: boolean;
 }
 
 interface MenuFormDialogProps {
@@ -65,7 +66,13 @@ function MenuForm({
       ? [...KATEGORI_OPTIONS, menu.kategori]
       : KATEGORI_OPTIONS;
   const [resep, setResep] = useState<ResepRow[]>(
-    menu ? menu.resep.map((r) => ({ bahanBakuId: r.bahanBakuId, takaran: r.takaran })) : [{ bahanBakuId: "", takaran: "" }]
+    menu
+      ? menu.resep.map((r) => ({
+          bahanBakuId: r.bahanBakuId,
+          takaran: r.takaran,
+          hanyaBawaPulang: r.hanyaBawaPulang,
+        }))
+      : [{ bahanBakuId: "", takaran: "", hanyaBawaPulang: false }]
   );
 
   function updateResepRow(index: number, patch: Partial<ResepRow>) {
@@ -73,7 +80,7 @@ function MenuForm({
   }
 
   function addResepRow() {
-    setResep((prev) => [...prev, { bahanBakuId: "", takaran: "" }]);
+    setResep((prev) => [...prev, { bahanBakuId: "", takaran: "", hanyaBawaPulang: false }]);
   }
 
   function removeResepRow(index: number) {
@@ -153,9 +160,9 @@ function MenuForm({
             {resep.map((row, index) => {
               const bahan = bahanBaku.find((b) => b.id === row.bahanBakuId);
               return (
-                <div key={index} className="flex items-center gap-2">
+                <div key={index} className="grid grid-cols-[minmax(0,1fr)_5.5rem_2.5rem] gap-2 sm:flex sm:items-center">
                   <Select value={row.bahanBakuId} onValueChange={(v) => updateResepRow(index, { bahanBakuId: v ?? "" })}>
-                    <SelectTrigger className="flex-1">
+                    <SelectTrigger className="col-span-3 min-w-0 sm:flex-1">
                       <SelectValue placeholder="Pilih bahan">{() => bahan?.nama ?? "Pilih bahan"}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
@@ -166,22 +173,37 @@ function MenuForm({
                       ))}
                     </SelectContent>
                   </Select>
+                  <Select
+                    value={row.hanyaBawaPulang ? "bawa-pulang" : "selalu"}
+                    onValueChange={(value) => updateResepRow(index, { hanyaBawaPulang: value === "bawa-pulang" })}
+                  >
+                    <SelectTrigger className="col-span-3 w-full sm:w-36 sm:shrink-0">
+                      <SelectValue>{row.hanyaBawaPulang ? "Bawa pulang" : "Selalu dipakai"}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="selalu">Selalu dipakai</SelectItem>
+                      <SelectItem value="bawa-pulang">Hanya bawa pulang</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Input
                     type="number"
                     min="0"
                     step="any"
                     placeholder="Takaran"
-                    className="w-28"
+                    className="w-full sm:w-28"
                     value={row.takaran}
                     onChange={(e) => updateResepRow(index, { takaran: e.target.value })}
                   />
-                  <span className="w-10 text-xs text-muted-foreground">{bahan?.satuan ?? ""}</span>
+                  <span className="col-start-2 row-start-3 w-10 self-center text-xs text-muted-foreground sm:col-auto sm:row-auto">
+                    {bahan?.satuan ?? ""}
+                  </span>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
                     aria-label="Hapus bahan"
                     disabled={resep.length === 1}
+                    className="col-start-3 row-start-3 justify-self-center"
                     onClick={() => removeResepRow(index)}
                   >
                     <Trash2 className="size-4" />
