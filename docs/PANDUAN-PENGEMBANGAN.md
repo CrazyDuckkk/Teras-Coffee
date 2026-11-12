@@ -121,6 +121,10 @@ M11 menambahkan ekspor Excel enam sheet, catatan siapa/kapan/periode ekspor, ser
 
 Uji manual M11: sebagai owner, ekspor laporan mingguan dan bulanan; pastikan keenam sheet, angka/tanggal, rumus dasar bagi hasil, dan riwayat nama file/waktu/pelaku sesuai. Ubah data pada periode yang sudah diekspor melalui void atau koreksi dan pastikan peringatan tampil; perubahan di luar periode tidak boleh memberi peringatan. Pastikan kasir tidak dapat membuka riwayat maupun endpoint ekspor.
 
+M12 memperluas Dashboard owner dengan ringkasan penjualan dan laba diakui hari ini/minggu ini dari query M10, panel perhatian (persetujuan dan umur tertua, tutup otomatis/selisih minggu ini, stok minimum, serta hutang tersisa berumur 30 hari atau lebih), dan daftar aktivitas di Pengaturan. Log aktivitas dibentuk dari kolom pelaku dan waktu di tabel domain yang sudah ada; tidak ada tabel log terpisah. Kotak persetujuan juga menampilkan jumlah dan umur tiap pengajuan.
+
+Uji manual M12: sebagai owner, pastikan angka Dashboard hari ini dan minggu ini cocok dengan Keuangan; ajukan void dan Stock Masuk menunggu harga lalu pastikan jumlah/umur tampil dan bertambah; cek tutup otomatis, selisih kas/QRIS, stok di bawah atau sama dengan batas minimum, dan hutang tepat 30 hari versus 29 hari. Buka Pengaturan dan cocokkan aktor, tindakan, dan waktu log dengan transaksi, persetujuan, Stock Masuk, pembayaran, penyesuaian, tutup kasir, dan perubahan jam. Pastikan kasir tetap diarahkan ke Transaksi dan tidak dapat membuka Pengaturan.
+
 ## 6. Cadangan database
 
 Folder `backups/` diabaikan git. Jangan pernah meng-commit isinya.
@@ -199,5 +203,5 @@ Status modul:
 | M8 Penyesuaian stok dan opname          | Kode dan tes otomatis lulus; menunggu uji manual |
 | M9 Tutup Kasir v2 dan jam otomatis      | Kode dan tes otomatis lulus; menunggu uji manual |
 | M10 Keuangan dan Laporan terpadu        | Kode dan tes otomatis lulus; menunggu uji manual |
-| M11 Ekspor Excel                        | Belum dimulai                                   |
-| M12 Dashboard owner dan log aktivitas   | Belum dimulai                                   |
+| M11 Ekspor Excel                        | Kode dan tes otomatis lulus; menunggu uji manual |
+| M12 Dashboard owner dan log aktivitas   | Kode dan tes otomatis lulus; menunggu uji manual |

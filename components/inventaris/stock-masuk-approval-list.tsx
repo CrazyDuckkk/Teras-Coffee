@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { formatTanggalWaktuWIB } from "@/lib/date";
+import { formatTanggalWaktuWIB, formatUmurMenit } from "@/lib/date";
 import { tampilkanPeringatanEkspor } from "@/components/keuangan/export-warning";
 import type { listStockMasukMenungguKonfirmasi } from "@/lib/queries/inventaris";
 
@@ -74,6 +74,7 @@ export function StockMasukApprovalList({ data }: { data: StockMasukMenunggu[] })
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium">{row.bahanNama}</span>
                     <Badge variant="outline">Menunggu konfirmasi harga</Badge>
+                    <Badge variant="outline">Menunggu {formatUmurMenit(row.umurMenit)}</Badge>
                     <span className="text-sm">
                       {Number(row.qty).toLocaleString("id-ID")} {row.satuan}
                     </span>

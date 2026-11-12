@@ -197,9 +197,9 @@ export async function listStockMasuk(bahanBakuId?: string) {
     .limit(100);
 }
 
-export async function listStockMasukMenungguKonfirmasi() {
+export async function listStockMasukMenungguKonfirmasi(now: Date = new Date()) {
   await requireRole("owner");
-  return db
+  const rows = await db
     .select({
       id: stockMasuk.id,
       tanggal: stockMasuk.tanggal,
@@ -217,6 +217,10 @@ export async function listStockMasukMenungguKonfirmasi() {
     .leftJoin(user, eq(user.id, stockMasuk.pelakuId))
     .where(and(eq(stockMasuk.statusHarga, "menunggu"), isNull(stockMasuk.dibatalkanAt)))
     .orderBy(desc(stockMasuk.tanggal));
+  return rows.map((row) => ({
+    ...row,
+    umurMenit: Math.max(0, Math.floor((now.getTime() - row.tanggal.getTime()) / 60_000)),
+  }));
 }
 
 export async function putuskanHargaStockMasuk(

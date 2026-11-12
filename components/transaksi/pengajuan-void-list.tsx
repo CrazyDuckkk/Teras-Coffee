@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Currency } from "@/components/shared/currency";
-import { formatTanggalWaktuWIB } from "@/lib/date";
+import { formatTanggalWaktuWIB, formatUmurMenit } from "@/lib/date";
 import { tampilkanPeringatanEkspor } from "@/components/keuangan/export-warning";
 import type { listPengajuanVoidMenunggu } from "@/lib/queries/transaksi";
 
@@ -76,6 +76,7 @@ export function PengajuanVoidList({ data }: { data: PengajuanVoidRow[] }) {
                       {formatTanggalWaktuWIB(new Date(request.transaksi.tanggal))}
                     </span>
                     <Badge variant="outline">Menunggu void</Badge>
+                    <Badge variant="outline">Menunggu {formatUmurMenit(request.umurMenit)}</Badge>
                     <Badge variant="outline">
                       {request.transaksi.metodeBayar === "qris"
                         ? "QRIS"

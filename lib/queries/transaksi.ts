@@ -417,7 +417,7 @@ export async function listTransaksiTujuhHari() {
   }));
 }
 
-export async function listPengajuanVoidMenunggu() {
+export async function listPengajuanVoidMenunggu(now: Date = new Date()) {
   await requireRole("owner");
   const rows = await db
     .select({ pengajuanVoid, transaksi, diajukanOlehNama: user.name })
@@ -442,6 +442,7 @@ export async function listPengajuanVoidMenunggu() {
 
   return rows.map(({ pengajuanVoid: request, transaksi: transaction, diajukanOlehNama }) => ({
     ...request,
+    umurMenit: Math.max(0, Math.floor((now.getTime() - request.diajukanAt.getTime()) / 60_000)),
     diajukanOlehNama,
     transaksi: {
       id: transaction.id,

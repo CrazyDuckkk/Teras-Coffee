@@ -80,3 +80,11 @@ export function formatTanggalWaktuWIB(date: Date): string {
     minute: "2-digit",
   }).format(date);
 }
+
+export function formatUmurMenit(menit: number | null): string {
+  if (menit === null) return "—";
+  if (menit < 60) return `${menit} menit`;
+  const jam = Math.floor(menit / 60);
+  if (jam < 24) return `${jam} jam`;
+  return `${Math.floor(jam / 24)} hari`;
+}

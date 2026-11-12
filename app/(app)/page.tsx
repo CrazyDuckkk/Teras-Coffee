@@ -5,7 +5,7 @@ import { StatCard } from "@/components/shared/stat-card";
 import { Button } from "@/components/ui/button";
 import { formatRupiah } from "@/lib/format";
 import { getDashboardSummary } from "@/lib/queries/dashboard";
-import { PeringatanInventaris } from "@/components/dashboard/peringatan-inventaris";
+import { PerluPerhatianPanel } from "@/components/dashboard/perlu-perhatian";
 import { MenuTerlarisCard } from "@/components/dashboard/menu-terlaris-card";
 import { redirect } from "next/navigation";
 import { requireSession, requireRole } from "@/lib/auth-guard";
@@ -16,13 +16,13 @@ export default async function DashboardPage() {
   if (session.user.role === "cashier") redirect("/transaksi");
   await requireRole("owner");
 
-  const { omzetHariIni, labaKotorHariIni, stokMenipis, menuTerlaris } = await getDashboardSummary();
+  const summary = await getDashboardSummary();
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Dashboard"
-        description="Ringkasan operasional kedai hari ini"
+        description="Ringkasan operasional kedai hari ini dan minggu ini"
         actions={
           <>
             <Button variant="outline" nativeButton={false} render={<Link href="/inventaris" />}>
@@ -36,20 +36,20 @@ export default async function DashboardPage() {
           </>
         }
       />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Omzet Hari Ini" value={formatRupiah(omzetHariIni)} icon={TrendingUp} />
-        <StatCard label="Laba Kotor Hari Ini" value={formatRupiah(labaKotorHariIni)} icon={Coins} tone="success" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StatCard label="Omzet Hari Ini" value={formatRupiah(summary.omzetHariIni)} icon={TrendingUp} />
+        <StatCard label="Laba Diakui Hari Ini" value={formatRupiah(summary.labaDiakuiHariIni)} icon={Coins} tone="success" />
+        <StatCard label="Omzet Minggu Ini" value={formatRupiah(summary.omzetMingguIni)} icon={TrendingUp} />
+        <StatCard label="Laba Diakui Minggu Ini" value={formatRupiah(summary.labaDiakuiMingguIni)} icon={Coins} tone="success" />
         <StatCard
           label="Bahan Stok Menipis"
-          value={String(stokMenipis.length)}
+          value={String(summary.stokMenipis.length)}
           icon={AlertTriangle}
-          tone={stokMenipis.length > 0 ? "danger" : "default"}
+          tone={summary.stokMenipis.length > 0 ? "danger" : "default"}
         />
       </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <PeringatanInventaris data={stokMenipis} />
-        <MenuTerlarisCard data={menuTerlaris} />
-      </div>
+      <PerluPerhatianPanel perhatian={summary.perhatian} stokMenipis={summary.stokMenipis} />
+      <MenuTerlarisCard data={summary.menuTerlaris} />
     </div>
   );
 }
