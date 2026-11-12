@@ -1,6 +1,5 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3,
   Calculator,
   ClipboardCheck,
   Coffee,
@@ -27,8 +26,6 @@ const OWNER_NAV_ITEMS: NavItem[] = [
   { href: "/persetujuan", label: "Persetujuan", icon: ClipboardCheck },
   { href: "/hutang", label: "Hutang", icon: HandCoins },
   { href: "/keuangan", label: "Keuangan", icon: Wallet },
-  { href: "/tutup-kasir", label: "Tutup Kasir", icon: Calculator },
-  { href: "/laporan", label: "Laporan", icon: BarChart3 },
   { href: "/pengaturan/akun", label: "Pengaturan", icon: Settings },
 ];
 

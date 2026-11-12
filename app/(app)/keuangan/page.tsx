@@ -1,36 +1,49 @@
 import { PageHeader } from "@/components/layout/page-header";
-import { StatCard } from "@/components/shared/stat-card";
-import { formatRupiah } from "@/lib/format";
-import { getKeuangan, type PeriodeKeuangan } from "@/lib/queries/keuangan";
-import { PeriodeFilter } from "@/components/keuangan/periode-filter";
-import { KeuanganList } from "@/components/keuangan/keuangan-list";
+import { PeriodeLaporanFilter } from "@/components/keuangan/periode-filter";
+import { LaporanTabs } from "@/components/keuangan/laporan-tabs";
+import { TutupKasirPanel } from "@/components/tutup-kasir/tutup-kasir-panel";
+import {
+  getKasAwalTutupKasir,
+  getTutupKasirHariIni,
+} from "@/lib/queries/tutup-kasir";
+import { getLaporanKeuangan } from "@/lib/queries/laporan-keuangan";
+import { buatRentangLaporan, type PeriodeLaporan } from "@/lib/laporan-keuangan-core";
 import { requireRole } from "@/lib/auth-guard";
 
-const VALID_PERIODE: PeriodeKeuangan[] = ["hari-ini", "7-hari", "30-hari", "semua"];
+const VALID_TAB = ["ringkasan", "buku-kas", "kas-harian", "laporan"];
 
 export default async function KeuanganPage({
   searchParams,
 }: {
-  searchParams: Promise<{ periode?: string }>;
+  searchParams: Promise<{ periode?: string; tanggal?: string; tab?: string }>;
 }) {
   await requireRole("owner");
-  const { periode: periodeParam } = await searchParams;
-  const periode: PeriodeKeuangan = VALID_PERIODE.includes(periodeParam as PeriodeKeuangan)
-    ? (periodeParam as PeriodeKeuangan)
-    : "30-hari";
+  const params = await searchParams;
+  const periode: PeriodeLaporan = params.periode === "mingguan" ? "mingguan" : "bulanan";
+  const tanggal = periode === "bulanan" && /^\d{4}-\d{2}$/.test(params.tanggal ?? "")
+    ? `${params.tanggal}-01`
+    : params.tanggal;
+  const range = buatRentangLaporan(periode, tanggal);
+  const activeTab = params.tab && VALID_TAB.includes(params.tab) ? params.tab : "ringkasan";
 
-  const { entries, totalPemasukan, totalPengeluaran, saldo } = await getKeuangan(periode);
+  const [data, penutupan, kasAwalSaran] = await Promise.all([
+    getLaporanKeuangan(range),
+    getTutupKasirHariIni(),
+    getKasAwalTutupKasir(),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Keuangan" description="Riwayat pemasukan dan pengeluaran" />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Total Pemasukan" value={formatRupiah(totalPemasukan)} tone="success" />
-        <StatCard label="Total Pengeluaran" value={formatRupiah(totalPengeluaran)} tone="danger" />
-        <StatCard label="Saldo" value={formatRupiah(saldo)} tone={saldo >= 0 ? "success" : "danger"} />
-      </div>
-      <PeriodeFilter current={periode} />
-      <KeuanganList entries={entries} />
+      <PageHeader title="Keuangan" description="Ringkasan, buku kas, kas harian, dan laporan terpadu" />
+      <PeriodeLaporanFilter periode={periode} tanggal={range.tanggalAcuan} />
+      <p className="text-sm text-muted-foreground">
+        Periode WIB: {range.tanggalMulai} sampai {range.tanggalAkhir}
+      </p>
+      <LaporanTabs
+        data={data}
+        activeTab={activeTab}
+        tutupKasirPanel={<TutupKasirPanel penutupan={penutupan} kasAwalSaran={kasAwalSaran} />}
+      />
     </div>
   );
 }

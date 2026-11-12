@@ -8,9 +8,13 @@ import {
   listRiwayatTutupKasir,
 } from "@/lib/queries/tutup-kasir";
 import { requireRole } from "@/lib/auth-guard";
+import { redirect } from "next/navigation";
 
 export default async function TutupKasirPage() {
   const session = await requireRole("owner", "cashier");
+  if (session.user.role === "owner") {
+    redirect("/keuangan?tab=kas-harian");
+  }
   if (session.user.role === "cashier") {
     const [penutupan, kasAwalSaran] = await Promise.all([
       getTutupKasirHariIniKasir(),

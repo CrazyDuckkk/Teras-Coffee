@@ -113,6 +113,12 @@ Untuk M9, kasir memasukkan kas awal, uang fisik, dan total QRIS merchant sebelum
 
 Uji manual M9: lakukan penutupan manual dan pastikan kas/QRIS serta selisih sesuai hitungan; tutup otomatis pada jam uji dan pastikan status belum diverifikasi tanpa selisih; ubah jam dan pastikan jadwal baru mulai besok; buat penjualan, pembayaran hutang, dan Stock Masuk setelah tutup lalu pastikan penanda "Setelah tutup" tampil dan tanggalnya tetap hari WIB yang sama.
 
+Untuk M10, halaman Keuangan menyatukan Ringkasan, Buku Kas, Kas Harian, dan Laporan dengan periode kalender mingguan (Senin–Minggu) atau bulanan. Semua angka layar dan ekspor menggunakan satu sumber laporan. Laba transaksi tunai/QRIS diakui pada tanggal transaksi; laba hutang baru diakui pada tanggal pelunasan terakhir. Dasar bagi hasil = laba diakui - biaya susut; pengeluaran operasional lain belum dicatat. Menu Keuangan memuat sisi owner dari Tutup Kasir, sedangkan kasir tetap memakai halaman Tutup Kasir.
+
+Uji manual M10: pilih minggu dan bulan berbeda, cocokkan penjualan per metode dengan transaksi; pastikan pembayaran hutang hanya masuk arus kas pada tanggal bayar dan labanya baru muncul setelah lunas; cocokkan biaya susut, piutang akhir periode, selisih kas/QRIS, status tutup otomatis, serta tabel Performa Menu.
+
+M11 menambahkan ekspor Excel enam sheet, catatan siapa/kapan/periode ekspor, dan peringatan jika void atau koreksi mengubah periode yang pernah diekspor.
+
 ## 6. Cadangan database
 
 Folder `backups/` diabaikan git. Jangan pernah meng-commit isinya.
@@ -190,4 +196,6 @@ Status modul:
 | M7 Stok Bahan dan Stock Masuk           | Kode dan tes otomatis lulus; menunggu uji manual |
 | M8 Penyesuaian stok dan opname          | Kode dan tes otomatis lulus; menunggu uji manual |
 | M9 Tutup Kasir v2 dan jam otomatis      | Kode dan tes otomatis lulus; menunggu uji manual |
-| M10 sampai M12                          | Belum dimulai                                   |
+| M10 Keuangan dan Laporan terpadu        | Kode dan tes otomatis lulus; menunggu uji manual |
+| M11 Ekspor Excel                        | Belum dimulai                                   |
+| M12 Dashboard owner dan log aktivitas   | Belum dimulai                                   |

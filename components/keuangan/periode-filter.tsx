@@ -1,35 +1,61 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { PeriodeKeuangan } from "@/lib/queries/keuangan";
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import type { PeriodeLaporan } from "@/lib/laporan-keuangan-core";
 
-const OPTIONS: { value: PeriodeKeuangan; label: string }[] = [
-  { value: "hari-ini", label: "Hari Ini" },
-  { value: "7-hari", label: "7 Hari" },
-  { value: "30-hari", label: "30 Hari" },
-  { value: "semua", label: "Semua" },
-];
-
-export function PeriodeFilter({ current }: { current: PeriodeKeuangan }) {
+export function PeriodeLaporanFilter({
+  periode,
+  tanggal,
+}: {
+  periode: PeriodeLaporan;
+  tanggal: string;
+}) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const [selectedPeriode, setSelectedPeriode] = useState(periode);
+  const [selectedTanggal, setSelectedTanggal] = useState(tanggal);
 
-  function handleChange(value: string | null) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("periode", value ?? "30-hari");
-    router.push(`/keuangan?${params.toString()}`);
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const tanggalParam = selectedPeriode === "bulanan"
+      ? `${selectedTanggal.slice(0, 7)}-01`
+      : selectedTanggal;
+    router.push(`/keuangan?periode=${selectedPeriode}&tanggal=${tanggalParam}`);
   }
 
   return (
-    <Tabs value={current} onValueChange={handleChange}>
-      <TabsList>
-        {OPTIONS.map((o) => (
-          <TabsTrigger key={o.value} value={o.value}>
-            {o.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-    </Tabs>
+    <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="text-muted-foreground">Periode kalender</span>
+        <select
+          value={selectedPeriode}
+          onChange={(event) => {
+            if (event.target.value === "mingguan" || event.target.value === "bulanan") {
+              setSelectedPeriode(event.target.value);
+            }
+          }}
+          className="h-9 rounded-md border border-input bg-background px-3"
+        >
+          <option value="mingguan">Mingguan (Senin–Minggu)</option>
+          <option value="bulanan">Bulanan</option>
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="text-muted-foreground">
+          {selectedPeriode === "bulanan" ? "Pilih bulan" : "Pilih tanggal dalam minggu"}
+        </span>
+        <input
+          type={selectedPeriode === "bulanan" ? "month" : "date"}
+          value={selectedPeriode === "bulanan" ? selectedTanggal.slice(0, 7) : selectedTanggal}
+          onChange={(event) => setSelectedTanggal(
+            selectedPeriode === "bulanan" ? `${event.target.value}-01` : event.target.value,
+          )}
+          required
+          className="h-9 rounded-md border border-input bg-background px-3"
+        />
+      </label>
+      <Button type="submit" variant="outline">Tampilkan</Button>
+    </form>
   );
 }
