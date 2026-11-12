@@ -31,11 +31,11 @@ function getPeriodeRange(periode: PeriodeLaporan): { start: Date; end: Date } {
 
 /**
  * Laporan dihitung live dari transaksi + stock_masuk (bukan tabel tersendiri, selaras
- * dengan pendekatan Keuangan). Hanya transaksi aktif (void dikecualikan).
+ * dengan pendekatan Keuangan). Pengajuan void tetap dihitung sampai disetujui.
  * - labaRugi = totalPemasukan - totalPengeluaran (periode) — angka CASH-FLOW: transaksi
  *   tunai/QRIS + hutang yang dilunasi dalam periode ini (berdasar tanggal_lunas), hutang yang
  *   belum lunas belum dihitung. Selaras dengan modul Keuangan & Tutup Kasir.
- * - menuTerlaris/menuMargin = ranking berdasarkan SEMUA penjualan aktif periode ini
+ * - menuTerlaris/menuMargin = ranking berdasarkan SEMUA penjualan yang belum di-void periode ini
  *   (termasuk hutang yang belum lunas — barang sudah keluar, terlepas dari status bayar).
  *   menuMargin dipakai untuk "Menu Paling Untung/Boncos" — margin per unit dipilih (bukan
  *   total profit) supaya item boncos tetap terlihat walau volume penjualannya kecil.
@@ -48,13 +48,19 @@ export async function getLaporan(periode: PeriodeLaporan = "harian") {
     db
       .select({ id: transaksi.id, totalPemasukan: transaksi.totalPemasukan })
       .from(transaksi)
-      .where(and(eq(transaksi.status, "aktif"), gte(transaksi.tanggal, start), lt(transaksi.tanggal, end))),
+      .where(
+        and(
+          inArray(transaksi.status, ["aktif", "menunggu_void"]),
+          gte(transaksi.tanggal, start),
+          lt(transaksi.tanggal, end)
+        )
+      ),
     db
       .select({ totalPemasukan: transaksi.totalPemasukan })
       .from(transaksi)
       .where(
         and(
-          eq(transaksi.status, "aktif"),
+          inArray(transaksi.status, ["aktif", "menunggu_void"]),
           inArray(transaksi.metodeBayar, ["tunai", "qris"]),
           gte(transaksi.tanggal, start),
           lt(transaksi.tanggal, end)

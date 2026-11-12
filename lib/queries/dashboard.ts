@@ -6,7 +6,7 @@ import { requireRole } from "@/lib/auth-guard";
 
 /**
  * "Laba kotor" di sini = margin penjualan hari ini: SUM((harga_jual_saat_itu - hpp_saat_itu) x qty)
- * dari transaksi aktif hari ini. Ini BEDA dari "Saldo" di Keuangan (pemasukan - pengeluaran, cash flow
+ * dari transaksi yang belum di-void hari ini. Ini BEDA dari "Saldo" di Keuangan (pemasukan - pengeluaran, cash flow
  * yang ikut memotong pembelian stok) — jangan disamakan.
  */
 export async function getDashboardSummary() {
@@ -16,7 +16,13 @@ export async function getDashboardSummary() {
   const transaksiHariIni = await db
     .select()
     .from(transaksi)
-    .where(and(eq(transaksi.status, "aktif"), gte(transaksi.tanggal, start), lt(transaksi.tanggal, end)));
+    .where(
+      and(
+        inArray(transaksi.status, ["aktif", "menunggu_void"]),
+        gte(transaksi.tanggal, start),
+        lt(transaksi.tanggal, end)
+      )
+    );
 
   const omzetHariIni = transaksiHariIni.reduce((sum, t) => sum + Number(t.totalPemasukan), 0);
 

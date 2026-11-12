@@ -19,13 +19,13 @@ export interface RingkasanHarian {
 }
 
 /**
- * Ringkasan transaksi aktif + stock masuk hari ini (WIB), dihitung live (belum tersimpan).
+ * Ringkasan transaksi yang belum di-void + stock masuk hari ini (WIB), dihitung live (belum tersimpan).
  * totalPenjualan/labaKotor di sini adalah angka CASH-FLOW (selaras dengan "saldo" di modul
  * Keuangan): transaksi TUNAI/QRIS hari ini + hutang yang dilunasi hari ini (walau transaksi
  * hutangnya sendiri terjadi di hari lain) — hutang yang belum lunas TIDAK ikut dihitung.
  * BEDA dari "Laba Kotor" di Dashboard yang berbasis margin per item (hargaJual - hpp) atas
  * SEMUA penjualan aktif hari ini (termasuk hutang yang belum lunas — barang sudah keluar).
- * menuTerlaris juga dihitung dari semua penjualan aktif hari ini, bukan cuma yang tunai.
+ * menuTerlaris juga dihitung dari semua penjualan yang belum di-void hari ini, bukan cuma yang tunai.
  * Field totalPenjualan/labaKotor inilah yang disimpan ke tabel tutup_kasir.
  */
 export async function getRingkasanHarian(now: Date = new Date()): Promise<RingkasanHarian> {
@@ -40,13 +40,19 @@ async function calculateRingkasanHarian(now: Date): Promise<RingkasanHarian> {
     db
       .select()
       .from(transaksi)
-      .where(and(eq(transaksi.status, "aktif"), gte(transaksi.tanggal, start), lt(transaksi.tanggal, end))),
+      .where(
+        and(
+          inArray(transaksi.status, ["aktif", "menunggu_void"]),
+          gte(transaksi.tanggal, start),
+          lt(transaksi.tanggal, end)
+        )
+      ),
     db
       .select({ totalPemasukan: transaksi.totalPemasukan })
       .from(transaksi)
       .where(
         and(
-          eq(transaksi.status, "aktif"),
+          inArray(transaksi.status, ["aktif", "menunggu_void"]),
           inArray(transaksi.metodeBayar, ["tunai", "qris"]),
           gte(transaksi.tanggal, start),
           lt(transaksi.tanggal, end)
@@ -110,7 +116,7 @@ export async function getRingkasanKasir(now: Date = new Date()) {
       .from(transaksi)
       .where(
         and(
-          eq(transaksi.status, "aktif"),
+          inArray(transaksi.status, ["aktif", "menunggu_void"]),
           inArray(transaksi.metodeBayar, ["tunai", "qris"]),
           gte(transaksi.tanggal, start),
           lt(transaksi.tanggal, end),

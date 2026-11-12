@@ -6,6 +6,7 @@ import {
   detailTransaksiBahan,
   hutang,
   menu,
+  pengajuanVoid,
   resepMenu,
   riwayatHargaBahan,
   transaksi,
@@ -44,6 +45,27 @@ export class TransaksiSudahVoidError extends Error {
   constructor() {
     super("Transaksi ini sudah di-void sebelumnya.");
     this.name = "TransaksiSudahVoidError";
+  }
+}
+
+export class PengajuanVoidSedangMenungguError extends Error {
+  constructor() {
+    super("Transaksi ini sedang menunggu keputusan owner.");
+    this.name = "PengajuanVoidSedangMenungguError";
+  }
+}
+
+export class TransaksiTidakDapatDiajukanVoidError extends Error {
+  constructor() {
+    super("Transaksi ini tidak dapat diajukan untuk void.");
+    this.name = "TransaksiTidakDapatDiajukanVoidError";
+  }
+}
+
+export class PengajuanVoidSudahDiprosesError extends Error {
+  constructor() {
+    super("Pengajuan void ini sudah diproses.");
+    this.name = "PengajuanVoidSudahDiprosesError";
   }
 }
 
@@ -204,51 +226,121 @@ export async function createTransaksi(input: TransaksiCreateInput, pelakuId: str
   });
 }
 
-/**
- * Void transaksi — lock row, tolak jika sudah void, dan kembalikan stok bahan sesuai snapshot
- * pemakaian saat transaksi dibuat. Kalau transaksi ini berasal dari Hutang: hutang yang belum lunas ikut
- * dihapus (piutang batal karena transaksinya batal); hutang yang sudah lunas menolak void
- * (uangnya sudah tercatat masuk di Keuangan — tidak bisa dibatalkan lewat void begitu saja).
- */
-export async function voidTransaksi(id: string) {
+async function applyVoid(
+  tx: DbOrTx,
+  id: string,
+  alasan: string,
+  voidedBy: string
+) {
+  const [row] = await tx.select().from(transaksi).where(eq(transaksi.id, id)).for("update");
+  if (!row) return null;
+  if (row.status === "void") throw new TransaksiSudahVoidError();
+  if (row.status !== "menunggu_void" && row.status !== "aktif") {
+    throw new TransaksiTidakDapatDiajukanVoidError();
+  }
+
+  if (row.metodeBayar === "hutang") {
+    const [hutangRow] = await tx.select().from(hutang).where(eq(hutang.transaksiId, id)).for("update");
+    if (hutangRow?.status === "lunas") throw new HutangSudahLunasError();
+    if (hutangRow) await tx.delete(hutang).where(eq(hutang.id, hutangRow.id));
+  }
+
+  const details = await tx.select().from(detailTransaksi).where(eq(detailTransaksi.transaksiId, id));
+  const snapshots = details.length
+    ? await tx
+        .select({
+          bahanBakuId: detailTransaksiBahan.bahanBakuId,
+          qtyDipakai: detailTransaksiBahan.qtyDipakai,
+        })
+        .from(detailTransaksiBahan)
+        .where(inArray(detailTransaksiBahan.detailTransaksiId, details.map((d) => d.id)))
+    : [];
+  const restoreByBahan = aggregateConsumptionSnapshots(snapshots);
+
+  for (const { bahanBakuId, qtyDipakai: amount } of restoreByBahan) {
+    await tx
+      .update(bahanBaku)
+      .set({ stokSaatIni: sql`${bahanBaku.stokSaatIni} + ${amount}`, updatedAt: new Date() })
+      .where(eq(bahanBaku.id, bahanBakuId));
+  }
+
+  const [updated] = await tx
+    .update(transaksi)
+    .set({ status: "void", voidedAt: new Date(), voidedBy, voidReason: alasan })
+    .where(eq(transaksi.id, id))
+    .returning();
+
+  return updated;
+}
+
+/** Void langsung oleh owner atau penyelesaian pengajuan yang disetujui. */
+export async function voidTransaksi(id: string, alasan: string, pelakuId: string) {
   await requireRole("owner");
   return db.transaction(async (tx) => {
     const [row] = await tx.select().from(transaksi).where(eq(transaksi.id, id)).for("update");
     if (!row) return null;
-    if (row.status !== "aktif") throw new TransaksiSudahVoidError();
+    if (row.status === "void") throw new TransaksiSudahVoidError();
+    if (row.status !== "aktif") throw new PengajuanVoidSedangMenungguError();
+    return applyVoid(tx, id, alasan, pelakuId);
+  });
+}
+
+export async function ajukanVoidTransaksi(id: string, alasan: string, pelakuId: string) {
+  await requireRole("owner", "cashier");
+  return db.transaction(async (tx) => {
+    const [row] = await tx.select().from(transaksi).where(eq(transaksi.id, id)).for("update");
+    if (!row) return null;
+    if (row.status !== "aktif") throw new TransaksiTidakDapatDiajukanVoidError();
 
     if (row.metodeBayar === "hutang") {
       const [hutangRow] = await tx.select().from(hutang).where(eq(hutang.transaksiId, id)).for("update");
       if (hutangRow?.status === "lunas") throw new HutangSudahLunasError();
-      if (hutangRow) await tx.delete(hutang).where(eq(hutang.id, hutangRow.id));
     }
 
-    const details = await tx.select().from(detailTransaksi).where(eq(detailTransaksi.transaksiId, id));
-    const snapshots = details.length
-      ? await tx
-          .select({
-            bahanBakuId: detailTransaksiBahan.bahanBakuId,
-            qtyDipakai: detailTransaksiBahan.qtyDipakai,
-          })
-          .from(detailTransaksiBahan)
-          .where(inArray(detailTransaksiBahan.detailTransaksiId, details.map((d) => d.id)))
-      : [];
-    const restoreByBahan = aggregateConsumptionSnapshots(snapshots);
-
-    for (const { bahanBakuId, qtyDipakai: amount } of restoreByBahan) {
-      await tx
-        .update(bahanBaku)
-        .set({ stokSaatIni: sql`${bahanBaku.stokSaatIni} + ${amount}`, updatedAt: new Date() })
-        .where(eq(bahanBaku.id, bahanBakuId));
-    }
-
-    const [updated] = await tx
-      .update(transaksi)
-      .set({ status: "void", voidedAt: new Date() })
-      .where(eq(transaksi.id, id))
+    const [request] = await tx
+      .insert(pengajuanVoid)
+      .values({ transaksiId: id, alasan, diajukanOleh: pelakuId })
       .returning();
 
-    return updated;
+    await tx.update(transaksi).set({ status: "menunggu_void" }).where(eq(transaksi.id, id));
+    return request;
+  });
+}
+
+export async function putuskanPengajuanVoid(
+  id: string,
+  keputusan: "setujui" | "tolak",
+  pelakuId: string
+) {
+  await requireRole("owner");
+  return db.transaction(async (tx) => {
+    const [request] = await tx.select().from(pengajuanVoid).where(eq(pengajuanVoid.id, id)).for("update");
+    if (!request) return null;
+    if (request.status !== "menunggu") throw new PengajuanVoidSudahDiprosesError();
+
+    const [row] = await tx.select().from(transaksi).where(eq(transaksi.id, request.transaksiId)).for("update");
+    if (!row || row.status !== "menunggu_void") throw new PengajuanVoidSudahDiprosesError();
+
+    const diputuskanAt = new Date();
+    await tx
+      .update(pengajuanVoid)
+      .set({
+        status: keputusan === "setujui" ? "disetujui" : "ditolak",
+        diputuskanOleh: pelakuId,
+        diputuskanAt,
+      })
+      .where(eq(pengajuanVoid.id, request.id));
+
+    if (keputusan === "tolak") {
+      const [updated] = await tx
+        .update(transaksi)
+        .set({ status: "aktif" })
+        .where(eq(transaksi.id, row.id))
+        .returning();
+      return updated;
+    }
+
+    return applyVoid(tx, row.id, request.alasan, pelakuId);
   });
 }
 
@@ -264,6 +356,26 @@ export async function listTransaksiTujuhHari() {
     .orderBy(desc(transaksi.tanggal));
 
   if (rows.length === 0) return [];
+
+  const pendingRequests = await db
+    .select({
+      transaksiId: pengajuanVoid.transaksiId,
+      alasan: pengajuanVoid.alasan,
+      diajukanAt: pengajuanVoid.diajukanAt,
+      diajukanOlehNama: user.name,
+    })
+    .from(pengajuanVoid)
+    .leftJoin(user, eq(user.id, pengajuanVoid.diajukanOleh))
+    .where(
+      and(
+        eq(pengajuanVoid.status, "menunggu"),
+        inArray(
+          pengajuanVoid.transaksiId,
+          rows.map((r) => r.transaksi.id)
+        )
+      )
+    );
+  const pendingByTransaction = new Map(pendingRequests.map((request) => [request.transaksiId, request]));
 
   const details = await db
     .select({
@@ -286,6 +398,43 @@ export async function listTransaksiTujuhHari() {
   return rows.map(({ transaksi: row, pelakuNama }) => ({
     ...row,
     pelakuNama,
+    pengajuanVoid: pendingByTransaction.get(row.id) ?? null,
     items: details.filter((d) => d.transaksiId === row.id),
+  }));
+}
+
+export async function listPengajuanVoidMenunggu() {
+  await requireRole("owner");
+  const rows = await db
+    .select({ pengajuanVoid, transaksi, diajukanOlehNama: user.name })
+    .from(pengajuanVoid)
+    .innerJoin(transaksi, eq(transaksi.id, pengajuanVoid.transaksiId))
+    .leftJoin(user, eq(user.id, pengajuanVoid.diajukanOleh))
+    .where(eq(pengajuanVoid.status, "menunggu"))
+    .orderBy(desc(pengajuanVoid.diajukanAt));
+
+  if (rows.length === 0) return [];
+
+  const details = await db
+    .select({
+      transaksiId: detailTransaksi.transaksiId,
+      menuNama: menu.nama,
+      qty: detailTransaksi.qty,
+      bawaPulang: detailTransaksi.bawaPulang,
+    })
+    .from(detailTransaksi)
+    .innerJoin(menu, eq(menu.id, detailTransaksi.menuId))
+    .where(inArray(detailTransaksi.transaksiId, rows.map((row) => row.transaksi.id)));
+
+  return rows.map(({ pengajuanVoid: request, transaksi: transaction, diajukanOlehNama }) => ({
+    ...request,
+    diajukanOlehNama,
+    transaksi: {
+      id: transaction.id,
+      tanggal: transaction.tanggal,
+      totalPemasukan: transaction.totalPemasukan,
+      metodeBayar: transaction.metodeBayar,
+      items: details.filter((detail) => detail.transaksiId === transaction.id),
+    },
   }));
 }

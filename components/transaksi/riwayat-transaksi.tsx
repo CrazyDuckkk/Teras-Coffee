@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Currency } from "@/components/shared/currency";
+import { Textarea } from "@/components/ui/textarea";
 import { formatTanggalWaktuWIB } from "@/lib/date";
 import type { listTransaksiTujuhHari } from "@/lib/queries/transaksi";
 
@@ -36,19 +37,32 @@ export function RiwayatTransaksi({
   const router = useRouter();
   const [voidTarget, setVoidTarget] = useState<TransaksiRow | null>(null);
   const [loading, setLoading] = useState(false);
+  const [alasan, setAlasan] = useState("");
 
   async function handleVoid() {
-    if (!voidTarget) return;
+    if (!voidTarget || !alasan.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/transaksi/${voidTarget.id}/void`, { method: "POST" });
+      const endpoint = canVoid
+        ? `/api/transaksi/${voidTarget.id}/void`
+        : `/api/transaksi/${voidTarget.id}/pengajuan-void`;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alasan }),
+      });
       const json = await res.json();
       if (!res.ok) {
         toast.error(json.error ?? "Gagal void transaksi");
         return;
       }
-      toast.success("Transaksi berhasil di-void, stok dikembalikan");
+      toast.success(
+        canVoid
+          ? "Transaksi berhasil di-void, stok dikembalikan"
+          : "Pengajuan void dikirim ke owner"
+      );
       setVoidTarget(null);
+      setAlasan("");
       router.refresh();
     } catch {
       toast.error("Tidak dapat menghubungi server. Coba lagi.");
@@ -79,6 +93,8 @@ export function RiwayatTransaksi({
                   <span className="text-sm font-medium">{formatTanggalWaktuWIB(new Date(t.tanggal))}</span>
                   {t.status === "void" ? (
                     <Badge variant="destructive">Void</Badge>
+                  ) : t.status === "menunggu_void" ? (
+                    <Badge variant="outline">Menunggu void</Badge>
                   ) : (
                     <Badge className="bg-success text-success-foreground">Aktif</Badge>
                   )}
@@ -96,11 +112,27 @@ export function RiwayatTransaksi({
                     Kasir: {t.pelakuNama ?? "Tidak diketahui"}
                   </span>
                 )}
+                {t.pengajuanVoid && (
+                  <span className="text-xs text-muted-foreground">
+                    Alasan pengajuan: {t.pengajuanVoid.alasan}
+                    {t.pengajuanVoid.diajukanOlehNama
+                      ? ` — ${t.pengajuanVoid.diajukanOlehNama}`
+                      : ""}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-3">
                 <Currency value={t.totalPemasukan} className="font-medium" />
-                {canVoid && t.status === "aktif" && (
-                  <Button variant="ghost" size="icon" aria-label="Void transaksi" onClick={() => setVoidTarget(t)}>
+                {t.status === "aktif" && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={canVoid ? "Void transaksi" : "Ajukan void transaksi"}
+                    onClick={() => {
+                      setAlasan("");
+                      setVoidTarget(t);
+                    }}
+                  >
                     <Ban className="size-4 text-danger-foreground" />
                   </Button>
                 )}
@@ -127,15 +159,24 @@ export function RiwayatTransaksi({
       <AlertDialog open={voidTarget !== null} onOpenChange={(open) => !open && setVoidTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Void transaksi ini?</AlertDialogTitle>
+            <AlertDialogTitle>{canVoid ? "Void transaksi ini?" : "Ajukan void transaksi?"}</AlertDialogTitle>
             <AlertDialogDescription>
-              Stok bahan baku yang terpakai akan dikembalikan ke kondisi semula. Aksi ini tidak bisa dibatalkan.
+              {canVoid
+                ? "Stok bahan baku yang terpakai akan dikembalikan. Alasan void wajib diisi."
+                : "Transaksi tetap dihitung dan stok tidak berubah sampai owner menyetujui pengajuan ini."}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <Textarea
+            aria-label="Alasan void"
+            placeholder="Tuliskan alasan"
+            maxLength={500}
+            value={alasan}
+            onChange={(event) => setAlasan(event.target.value)}
+          />
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleVoid} disabled={loading}>
-              {loading ? "Memproses..." : "Void"}
+            <AlertDialogAction onClick={handleVoid} disabled={loading || !alasan.trim()}>
+              {loading ? "Memproses..." : canVoid ? "Void" : "Kirim pengajuan"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

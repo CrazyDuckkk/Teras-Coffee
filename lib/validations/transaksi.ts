@@ -15,3 +15,11 @@ export const transaksiCreateSchema = z.object({
   path: ["namaPelanggan"],
 });
 export type TransaksiCreateInput = z.infer<typeof transaksiCreateSchema>;
+
+export const voidReasonSchema = z.object({
+  alasan: z.string().trim().min(1, "Alasan wajib diisi").max(500, "Alasan maksimal 500 karakter"),
+});
+
+export const keputusanVoidSchema = z.object({
+  keputusan: z.enum(["setujui", "tolak"]),
+});

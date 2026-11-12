@@ -29,7 +29,7 @@ export function getPeriodeRange(periode: PeriodeKeuangan): { start?: Date; end?:
 }
 
 /**
- * Keuangan = gabungan (bukan tabel terpisah): transaksi tunai/QRIS aktif + hutang yang SUDAH
+ * Keuangan = gabungan (bukan tabel terpisah): transaksi tunai/QRIS yang belum di-void + hutang yang SUDAH
  * LUNAS sebagai pemasukan (dengan tanggal_lunas, bukan tanggal transaksi awal), stock_masuk
  * sebagai pengeluaran. Transaksi void TIDAK dihitung. Hutang yang belum lunas belum masuk
  * cash-flow sama sekali — baru muncul di sini setelah ditandai lunas (lihat lib/queries/hutang.ts).
@@ -39,7 +39,7 @@ export async function getKeuangan(periode: PeriodeKeuangan = "30-hari") {
   const { start, end } = getPeriodeRange(periode);
 
   const pemasukanLangsungFilters = [
-    eq(transaksi.status, "aktif"),
+    inArray(transaksi.status, ["aktif", "menunggu_void"]),
     inArray(transaksi.metodeBayar, ["tunai", "qris"]),
   ];
   if (start) pemasukanLangsungFilters.push(gte(transaksi.tanggal, start));
