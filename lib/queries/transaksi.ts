@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   bahanBaku,
@@ -127,11 +127,18 @@ export async function createTransaksi(input: TransaksiCreateInput, pelakuId: str
       .from(resepMenu)
       .where(inArray(resepMenu.menuId, menuIds));
 
-    const requiredByBahan = getRequiredIngredients(input.items, resepRows);
+    const requiredByBahan = getRequiredIngredients(input.items, resepRows).sort((a, b) =>
+      a.bahanBakuId.localeCompare(b.bahanBakuId)
+    );
 
     const bahanIds = requiredByBahan.map((r) => r.bahanBakuId);
     const bahanRows = bahanIds.length
-      ? await tx.select().from(bahanBaku).where(inArray(bahanBaku.id, bahanIds)).for("update")
+      ? await tx
+          .select()
+          .from(bahanBaku)
+          .where(inArray(bahanBaku.id, bahanIds))
+          .orderBy(asc(bahanBaku.id))
+          .for("update")
       : [];
     const bahanMap = new Map(bahanRows.map((b) => [b.id, b]));
 
@@ -256,7 +263,9 @@ async function applyVoid(
         .from(detailTransaksiBahan)
         .where(inArray(detailTransaksiBahan.detailTransaksiId, details.map((d) => d.id)))
     : [];
-  const restoreByBahan = aggregateConsumptionSnapshots(snapshots);
+  const restoreByBahan = aggregateConsumptionSnapshots(snapshots).sort((a, b) =>
+    a.bahanBakuId.localeCompare(b.bahanBakuId)
+  );
 
   for (const { bahanBakuId, qtyDipakai: amount } of restoreByBahan) {
     await tx

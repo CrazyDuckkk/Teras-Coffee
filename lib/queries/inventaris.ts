@@ -1,9 +1,26 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { bahanBaku, menu, resepMenu, riwayatHargaBahan, stockMasuk, user } from "@/db/schema";
-import type { BahanBakuCreateInput, BahanBakuUpdateInput, StockMasukCreateInput } from "@/lib/validations/inventaris";
+import {
+  bahanBaku,
+  menu,
+  penyesuaianStok,
+  penyesuaianStokDetail,
+  resepMenu,
+  riwayatHargaBahan,
+  stockMasuk,
+  user,
+} from "@/db/schema";
+import type {
+  BahanBakuCreateInput,
+  BahanBakuUpdateInput,
+  OpnameStokInput,
+  PenyesuaianStokCreateInput,
+  StockMasukCreateInput,
+} from "@/lib/validations/inventaris";
 import { requireRole } from "@/lib/auth-guard";
 import {
+  catatOpnameStokTx,
+  catatPenyesuaianStokTx,
   catatStockMasukTx,
   koreksiStockMasukTx,
   listStokBahanCore,
@@ -217,4 +234,122 @@ export async function koreksiStockMasuk(id: string, alasan: string, pelakuId: st
 export async function listStokBahan() {
   await requireRole("owner", "cashier");
   return listStokBahanCore(db);
+}
+
+export async function listMenuUntukPenyesuaian() {
+  await requireRole("owner", "cashier");
+  return db
+    .select({ id: menu.id, nama: menu.nama })
+    .from(menu)
+    .where(eq(menu.isActive, true))
+    .orderBy(menu.kategori, menu.nama);
+}
+
+export type RiwayatPenyesuaianStok = {
+  id: string;
+  jenis: (typeof penyesuaianStok.$inferSelect)["jenis"];
+  alasan: string;
+  menuNama: string | null;
+  bawaPulang: boolean | null;
+  pelakuNama: string | null;
+  createdAt: Date;
+  details: {
+    bahanBakuId: string;
+    bahanNama: string;
+    satuan: (typeof bahanBaku.$inferSelect)["satuan"];
+    perubahanQty: string;
+    stokSebelum: string;
+    stokSesudah: string;
+    nilaiSusut?: string;
+  }[];
+};
+
+export async function listRiwayatPenyesuaianStok(): Promise<RiwayatPenyesuaianStok[]> {
+  const session = await requireRole("owner", "cashier");
+  const isOwner = session.user.role === "owner";
+  const rows = await db
+    .select({
+      id: penyesuaianStok.id,
+      jenis: penyesuaianStok.jenis,
+      alasan: penyesuaianStok.alasan,
+      menuNama: menu.nama,
+      bawaPulang: penyesuaianStok.bawaPulang,
+      pelakuNama: user.name,
+      createdAt: penyesuaianStok.createdAt,
+    })
+    .from(penyesuaianStok)
+    .leftJoin(menu, eq(menu.id, penyesuaianStok.menuId))
+    .leftJoin(user, eq(user.id, penyesuaianStok.pelakuId))
+    .orderBy(desc(penyesuaianStok.createdAt))
+    .limit(100);
+  if (rows.length === 0) return [];
+
+  const detailIds = rows.map((row) => row.id);
+  if (isOwner) {
+    const details = await db
+        .select({
+          penyesuaianStokId: penyesuaianStokDetail.penyesuaianStokId,
+          bahanBakuId: penyesuaianStokDetail.bahanBakuId,
+          bahanNama: bahanBaku.nama,
+          satuan: bahanBaku.satuan,
+          perubahanQty: penyesuaianStokDetail.perubahanQty,
+          stokSebelum: penyesuaianStokDetail.stokSebelum,
+          stokSesudah: penyesuaianStokDetail.stokSesudah,
+          nilaiSusut: penyesuaianStokDetail.nilaiSusut,
+        })
+        .from(penyesuaianStokDetail)
+        .innerJoin(bahanBaku, eq(bahanBaku.id, penyesuaianStokDetail.bahanBakuId))
+        .where(inArray(penyesuaianStokDetail.penyesuaianStokId, detailIds))
+    return rows.map((row) => ({
+      ...row,
+      details: details
+        .filter((detail) => detail.penyesuaianStokId === row.id)
+        .map((detail) => ({
+          bahanBakuId: detail.bahanBakuId,
+          bahanNama: detail.bahanNama,
+          satuan: detail.satuan,
+          perubahanQty: detail.perubahanQty,
+          stokSebelum: detail.stokSebelum,
+          stokSesudah: detail.stokSesudah,
+          nilaiSusut: detail.nilaiSusut,
+        })),
+    }));
+  }
+
+  const details = await db
+    .select({
+      penyesuaianStokId: penyesuaianStokDetail.penyesuaianStokId,
+      bahanBakuId: penyesuaianStokDetail.bahanBakuId,
+      bahanNama: bahanBaku.nama,
+      satuan: bahanBaku.satuan,
+      perubahanQty: penyesuaianStokDetail.perubahanQty,
+      stokSebelum: penyesuaianStokDetail.stokSebelum,
+      stokSesudah: penyesuaianStokDetail.stokSesudah,
+    })
+    .from(penyesuaianStokDetail)
+    .innerJoin(bahanBaku, eq(bahanBaku.id, penyesuaianStokDetail.bahanBakuId))
+    .where(inArray(penyesuaianStokDetail.penyesuaianStokId, detailIds));
+  return rows.map((row) => ({
+    ...row,
+    details: details
+      .filter((detail) => detail.penyesuaianStokId === row.id)
+      .map((detail) => ({
+        bahanBakuId: detail.bahanBakuId,
+        bahanNama: detail.bahanNama,
+        satuan: detail.satuan,
+        perubahanQty: detail.perubahanQty,
+        stokSebelum: detail.stokSebelum,
+        stokSesudah: detail.stokSesudah,
+      })),
+  }));
+}
+
+export async function catatPenyesuaianStok(input: PenyesuaianStokCreateInput, pelakuId: string) {
+  await requireRole("owner", "cashier");
+  return db.transaction((tx) => catatPenyesuaianStokTx(tx, input, pelakuId));
+}
+
+export async function catatOpnameStok(input: OpnameStokInput, pelakuId: string) {
+  await requireRole("owner");
+  return db.transaction((tx) => catatOpnameStokTx(tx, input, pelakuId));
 }

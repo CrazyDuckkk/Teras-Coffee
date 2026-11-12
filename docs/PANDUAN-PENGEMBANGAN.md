@@ -105,6 +105,10 @@ Untuk M7, keputusan harga dilakukan per entri Stock Masuk. Koreksi owner membata
 
 Uji manual M7: sebagai kasir, pastikan halaman Stok Bahan tidak menampilkan harga; catat Stock Masuk dengan kedua pilihan sumber pembayaran; pastikan stok bertambah langsung dan usulan harga berubah menunggu owner. Sebagai owner, setujui/tolak harga, lalu koreksi satu entri dan pastikan stok serta laporan pengeluaran dibalik.
 
+Untuk M8, penyesuaian menu memakai mode makan di tempat/bawa pulang: bahan kemasan hanya terpotong saat bawa pulang. Penyesuaian bahan dan opname mencatat stok sebelum/sesudah serta pelaku; pengurangan dihitung sebagai nilai susut dengan harga aktif saat itu. Opname khusus owner dan boleh menaikkan atau menurunkan stok.
+
+Uji manual M8: sebagai kasir, catat menu tumpah mode makan di tempat dan menu gagal mode bawa pulang; pastikan hanya resep yang sesuai mode terpotong dan kasir tidak menerima nilai susut. Coba kalibrasi, tes rasa, bahan rusak, dan kedaluwarsa dengan alasan. Sebagai owner, lakukan opname dengan stok fisik lebih rendah lalu lebih tinggi; pastikan pengurangan mencatat nilai susut, penambahan tidak, serta endpoint opname menolak kasir.
+
 ## 6. Cadangan database
 
 Folder `backups/` diabaikan git. Jangan pernah meng-commit isinya.
@@ -180,4 +184,5 @@ Status modul:
 | M5 Pengajuan void dan void owner       | Lulus                                       |
 | M6 Hutang dan pembayaran sebagian      | Kode dan tes otomatis lulus; menunggu uji manual |
 | M7 Stok Bahan dan Stock Masuk           | Kode dan tes otomatis lulus; menunggu uji manual |
-| M8 sampai M12                           | Belum dimulai                                   |
+| M8 Penyesuaian stok dan opname          | Kode dan tes otomatis lulus; menunggu uji manual |
+| M9 sampai M12                           | Belum dimulai                                   |

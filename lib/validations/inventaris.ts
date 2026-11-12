@@ -58,3 +58,43 @@ export const keputusanHargaStockMasukSchema = z.object({
 export const koreksiStockMasukSchema = z.object({
   alasan: z.string().trim().min(3, "Alasan koreksi wajib diisi").max(500),
 });
+
+const qtyPenyesuaianSchema = z
+  .coerce.number()
+  .finite("Qty tidak valid")
+  .positive("Qty harus lebih dari 0")
+  .max(9_999_999_999.99, "Qty terlalu besar")
+  .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7, "Qty maksimal 2 angka desimal");
+
+const alasanPenyesuaianSchema = z.string().trim().min(3, "Alasan wajib diisi").max(500);
+
+export const penyesuaianStokCreateSchema = z.discriminatedUnion("jenis", [
+  z.object({
+    jenis: z.enum(["menu_tumpah", "menu_gagal"]),
+    menuId: z.string().uuid("Menu tidak valid"),
+    bawaPulang: z.boolean(),
+    alasan: alasanPenyesuaianSchema,
+  }),
+  z.object({
+    jenis: z.enum(["kalibrasi", "tes_rasa", "rusak", "kedaluwarsa"]),
+    bahanBakuId: z.string().uuid("Bahan baku tidak valid"),
+    qty: qtyPenyesuaianSchema,
+    alasan: alasanPenyesuaianSchema,
+  }),
+]);
+export type PenyesuaianStokCreateInput = z.infer<typeof penyesuaianStokCreateSchema>;
+
+export const opnameStokSchema = z.object({
+  bahanBakuId: z.string().uuid("Bahan baku tidak valid"),
+  stokFisik: z
+    .coerce.number()
+    .finite("Stok fisik tidak valid")
+    .min(0, "Stok fisik tidak boleh negatif")
+    .max(9_999_999_999.99, "Stok fisik terlalu besar")
+    .refine(
+      (value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7,
+      "Stok fisik maksimal 2 angka desimal"
+    ),
+  alasan: alasanPenyesuaianSchema,
+});
+export type OpnameStokInput = z.infer<typeof opnameStokSchema>;

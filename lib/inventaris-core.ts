@@ -1,7 +1,19 @@
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import type { db } from "@/db";
-import { bahanBaku, riwayatHargaBahan, stockMasuk } from "@/db/schema";
-import type { StockMasukCreateInput } from "@/lib/validations/inventaris";
+import {
+  bahanBaku,
+  menu,
+  penyesuaianStok,
+  penyesuaianStokDetail,
+  resepMenu,
+  riwayatHargaBahan,
+  stockMasuk,
+} from "@/db/schema";
+import type {
+  OpnameStokInput,
+  PenyesuaianStokCreateInput,
+  StockMasukCreateInput,
+} from "@/lib/validations/inventaris";
 import type { UserRole } from "@/lib/roles";
 
 export type InventarisDbOrTx = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -50,8 +62,177 @@ export class StokTidakCukupUntukKoreksiError extends Error {
   }
 }
 
+export class BahanPenyesuaianTidakDitemukanError extends Error {
+  constructor() {
+    super("Bahan baku tidak ditemukan atau sudah tidak aktif.");
+    this.name = "BahanPenyesuaianTidakDitemukanError";
+  }
+}
+
+export class MenuPenyesuaianTidakDitemukanError extends Error {
+  constructor() {
+    super("Menu tidak ditemukan atau sudah tidak aktif.");
+    this.name = "MenuPenyesuaianTidakDitemukanError";
+  }
+}
+
+export class MenuTidakAdaBahanPenyesuaianError extends Error {
+  constructor() {
+    super("Resep menu tidak memiliki bahan untuk mode yang dipilih.");
+    this.name = "MenuTidakAdaBahanPenyesuaianError";
+  }
+}
+
+export class StokTidakCukupUntukPenyesuaianError extends Error {
+  constructor(public bahanNama: string, public tersedia: string, public dibutuhkan: string) {
+    super(`Stok ${bahanNama} tidak cukup (tersedia ${tersedia}, dibutuhkan ${dibutuhkan}).`);
+    this.name = "StokTidakCukupUntukPenyesuaianError";
+  }
+}
+
+export class HargaSusutTidakDiketahuiError extends Error {
+  constructor(public bahanNama: string) {
+    super(`Harga aktif ${bahanNama} belum tersedia, sehingga nilai susut tidak dapat dihitung.`);
+    this.name = "HargaSusutTidakDiketahuiError";
+  }
+}
+
+export class OpnameTanpaSelisihError extends Error {
+  constructor() {
+    super("Stok fisik sama dengan stok sistem; tidak ada penyesuaian yang perlu dicatat.");
+    this.name = "OpnameTanpaSelisihError";
+  }
+}
+
+export class NilaiPenyesuaianTerlaluBesarError extends Error {
+  constructor() {
+    super("Nilai penyesuaian melebihi batas penyimpanan.");
+    this.name = "NilaiPenyesuaianTerlaluBesarError";
+  }
+}
+
 function keDuaDesimal(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+const NILAI_MAKSIMUM_SEN = 999_999_999_999;
+
+function kePerseratus(value: string | number): number {
+  const scaled = Math.round(Number(value) * 100);
+  if (!Number.isSafeInteger(scaled)) throw new NilaiPenyesuaianTerlaluBesarError();
+  return scaled;
+}
+
+function dariPerseratus(value: number): string {
+  const negative = value < 0;
+  const absolute = Math.abs(value);
+  return `${negative ? "-" : ""}${Math.trunc(absolute / 100)}.${String(absolute % 100).padStart(2, "0")}`;
+}
+
+function hitungNilaiSusut(qtyPerseratus: number, hargaPerseratus: number): number {
+  if (qtyPerseratus <= 0 || hargaPerseratus < 0) throw new NilaiPenyesuaianTerlaluBesarError();
+  if (hargaPerseratus === 0) return 0;
+  const produkMaksimum = NILAI_MAKSIMUM_SEN * 100 + 49;
+  if (qtyPerseratus > Math.floor(produkMaksimum / hargaPerseratus)) {
+    throw new NilaiPenyesuaianTerlaluBesarError();
+  }
+  const nilaiSen = Math.floor((qtyPerseratus * hargaPerseratus + 50) / 100);
+  if (nilaiSen > NILAI_MAKSIMUM_SEN) throw new NilaiPenyesuaianTerlaluBesarError();
+  return nilaiSen;
+}
+
+type PerubahanBahan = {
+  bahanBakuId: string;
+  bahanNama: string;
+  perubahanQty: number;
+  stokSebelum: number;
+  stokSesudah: number;
+  hargaPerSatuan: string | null;
+  nilaiSusut: number;
+};
+
+async function siapkanPerubahanBahan(
+  tx: InventarisDbOrTx,
+  bahanBakuId: string,
+  perubahanQty: number
+): Promise<PerubahanBahan> {
+  const [bahan] = await tx.select().from(bahanBaku).where(eq(bahanBaku.id, bahanBakuId)).for("update");
+  if (!bahan || !bahan.isActive) throw new BahanPenyesuaianTidakDitemukanError();
+
+  const stokSebelum = kePerseratus(bahan.stokSaatIni);
+  const stokSesudah = stokSebelum + perubahanQty;
+  if (stokSesudah < 0) {
+    throw new StokTidakCukupUntukPenyesuaianError(
+      bahan.nama,
+      dariPerseratus(stokSebelum),
+      dariPerseratus(-perubahanQty)
+    );
+  }
+  if (stokSesudah > NILAI_MAKSIMUM_SEN) throw new NilaiPenyesuaianTerlaluBesarError();
+
+  const hargaPerSatuan = await getHargaAktifTx(tx, bahanBakuId);
+  let nilaiSusut = 0;
+  if (perubahanQty < 0) {
+    if (hargaPerSatuan === null) throw new HargaSusutTidakDiketahuiError(bahan.nama);
+    nilaiSusut = hitungNilaiSusut(-perubahanQty, kePerseratus(hargaPerSatuan));
+    if (nilaiSusut > NILAI_MAKSIMUM_SEN) throw new NilaiPenyesuaianTerlaluBesarError();
+  }
+
+  return {
+    bahanBakuId,
+    bahanNama: bahan.nama,
+    perubahanQty,
+    stokSebelum,
+    stokSesudah,
+    hargaPerSatuan,
+    nilaiSusut,
+  };
+}
+
+async function simpanPenyesuaianTx(
+  tx: InventarisDbOrTx,
+  values: {
+    jenis: (typeof penyesuaianStok.$inferInsert)["jenis"];
+    alasan: string;
+    menuId?: string;
+    bawaPulang?: boolean;
+    pelakuId: string;
+  },
+  perubahan: PerubahanBahan[],
+  now: Date
+) {
+  const [entry] = await tx
+    .insert(penyesuaianStok)
+    .values({
+      jenis: values.jenis,
+      alasan: values.alasan,
+      menuId: values.menuId,
+      bawaPulang: values.bawaPulang,
+      pelakuId: values.pelakuId,
+      createdAt: now,
+    })
+    .returning();
+
+  for (const item of perubahan) {
+    await tx
+      .update(bahanBaku)
+      .set({ stokSaatIni: dariPerseratus(item.stokSesudah), updatedAt: now })
+      .where(eq(bahanBaku.id, item.bahanBakuId));
+  }
+
+  await tx.insert(penyesuaianStokDetail).values(
+    perubahan.map((item) => ({
+      penyesuaianStokId: entry.id,
+      bahanBakuId: item.bahanBakuId,
+      perubahanQty: dariPerseratus(item.perubahanQty),
+      stokSebelum: dariPerseratus(item.stokSebelum),
+      stokSesudah: dariPerseratus(item.stokSesudah),
+      hargaPerSatuan: item.hargaPerSatuan,
+      nilaiSusut: dariPerseratus(item.nilaiSusut),
+    }))
+  );
+
+  return entry;
 }
 
 export async function getHargaAktifTx(tx: InventarisDbOrTx, bahanBakuId: string) {
@@ -225,4 +406,105 @@ export async function koreksiStockMasukTx(
     .where(and(eq(riwayatHargaBahan.stockMasukId, id), isNull(riwayatHargaBahan.dibatalkanAt)));
 
   return updated;
+}
+
+export async function catatPenyesuaianStokTx(
+  tx: InventarisDbOrTx,
+  input: PenyesuaianStokCreateInput,
+  pelakuId: string,
+  now: Date = new Date()
+) {
+  if ("menuId" in input) {
+    const [menuRow] = await tx
+      .select()
+      .from(menu)
+      .where(and(eq(menu.id, input.menuId), eq(menu.isActive, true)))
+      .for("update");
+    if (!menuRow) throw new MenuPenyesuaianTidakDitemukanError();
+
+    const resep = await tx
+      .select({
+        bahanBakuId: resepMenu.bahanBakuId,
+        takaran: resepMenu.takaran,
+        hanyaBawaPulang: resepMenu.hanyaBawaPulang,
+      })
+      .from(resepMenu)
+      .where(eq(resepMenu.menuId, input.menuId))
+      .orderBy(asc(resepMenu.bahanBakuId));
+    const bahanTerpakai = resep.filter((row) => input.bawaPulang || !row.hanyaBawaPulang);
+    if (bahanTerpakai.length === 0) throw new MenuTidakAdaBahanPenyesuaianError();
+
+    const perubahan: PerubahanBahan[] = [];
+    for (const row of bahanTerpakai) {
+      perubahan.push(
+        await siapkanPerubahanBahan(tx, row.bahanBakuId, -kePerseratus(row.takaran))
+      );
+    }
+
+    return simpanPenyesuaianTx(
+      tx,
+      {
+        jenis: input.jenis,
+        alasan: input.alasan,
+        menuId: input.menuId,
+        bawaPulang: input.bawaPulang,
+        pelakuId,
+      },
+      perubahan,
+      now
+    );
+  }
+
+  const perubahan = await siapkanPerubahanBahan(tx, input.bahanBakuId, -kePerseratus(input.qty));
+  return simpanPenyesuaianTx(
+    tx,
+    { jenis: input.jenis, alasan: input.alasan, pelakuId },
+    [perubahan],
+    now
+  );
+}
+
+export async function catatOpnameStokTx(
+  tx: InventarisDbOrTx,
+  input: OpnameStokInput,
+  pelakuId: string,
+  now: Date = new Date()
+) {
+  const [bahan] = await tx
+    .select()
+    .from(bahanBaku)
+    .where(eq(bahanBaku.id, input.bahanBakuId))
+    .for("update");
+  if (!bahan || !bahan.isActive) throw new BahanPenyesuaianTidakDitemukanError();
+
+  const stokSebelum = kePerseratus(bahan.stokSaatIni);
+  const stokSesudah = kePerseratus(input.stokFisik);
+  const perubahanQty = stokSesudah - stokSebelum;
+  if (perubahanQty === 0) throw new OpnameTanpaSelisihError();
+
+  let hargaPerSatuan: string | null = null;
+  let nilaiSusut = 0;
+  if (perubahanQty < 0) {
+    hargaPerSatuan = await getHargaAktifTx(tx, input.bahanBakuId);
+    if (hargaPerSatuan === null) throw new HargaSusutTidakDiketahuiError(bahan.nama);
+    nilaiSusut = hitungNilaiSusut(-perubahanQty, kePerseratus(hargaPerSatuan));
+    if (nilaiSusut > NILAI_MAKSIMUM_SEN) throw new NilaiPenyesuaianTerlaluBesarError();
+  }
+
+  return simpanPenyesuaianTx(
+    tx,
+    { jenis: "opname", alasan: input.alasan, pelakuId },
+    [
+      {
+        bahanBakuId: bahan.id,
+        bahanNama: bahan.nama,
+        perubahanQty,
+        stokSebelum,
+        stokSesudah,
+        hargaPerSatuan,
+        nilaiSusut,
+      },
+    ],
+    now
+  );
 }

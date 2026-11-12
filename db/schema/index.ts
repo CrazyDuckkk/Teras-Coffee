@@ -12,3 +12,4 @@ export * from "./hutang-pembayaran";
 export * from "./auth";
 export * from "./pengaturan";
 export * from "./pengajuan-void";
+export * from "./penyesuaian-stok";

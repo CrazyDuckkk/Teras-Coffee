@@ -72,7 +72,7 @@ Transaksi, Hutang, Stok Bahan, Tutup Kasir. Halaman awal kasir adalah Transaksi.
   - Stok bertambah langsung.
   - Harga baru berstatus **menunggu konfirmasi owner**; selama itu HPP tetap memakai harga lama.
 - **Catat Penyesuaian** (langsung berlaku, alasan wajib, pelaku tercatat):
-  - tumpah atau gagal dibuat: dipilih per menu (satu porsi), memotong seluruh bahan resepnya;
+- tumpah atau gagal dibuat: dipilih per menu (satu porsi) dan mode makan di tempat/bawa pulang; bahan kemasan ikut hanya untuk mode bawa pulang;
   - kalibrasi atau tes rasa: dipilih per bahan dengan jumlah (misalnya gram kopi);
   - rusak atau kedaluwarsa: per bahan.
 - Kasir tidak bisa membuat, mengubah, atau menonaktifkan bahan, dan tidak bisa melakukan opname.
@@ -124,7 +124,7 @@ Owner dapat melakukan semua yang dapat dilakukan kasir; tidak ada halaman kasir 
 
 - Data master bahan, harga aktif, dan riwayat harga.
 - Konfirmasi harga Stock Masuk dari kasir.
-- **Opname** (koreksi hitung fisik): hanya owner, karena dapat menghapus selisih stok.
+- **Opname** (koreksi hitung fisik): hanya owner, dapat menaikkan atau menurunkan stok ke jumlah fisik; hanya selisih turun menjadi nilai susut.
 
 ### 4.6 Pengaturan
 
@@ -147,7 +147,7 @@ Owner dapat melakukan semua yang dapat dilakukan kasir; tidak ada halaman kasir 
 - **Laba transaksi** = harga jual - HPP saat itu, dan **diakui pada tanggal transaksi lunas**. Transaksi tunai dan QRIS lunas di hari itu; hutang diakui saat pelunasan terakhir.
 - **Pembayaran sebagian** masuk arus kas pada tanggalnya, tetapi labanya baru diakui saat lunas.
 - **Pembelian stok tidak dikurangkan lagi** dari laba karena sudah terbawa lewat HPP.
-- **Biaya susut**: dari penyesuaian stok, bernilai harga aktif bahan, ditampilkan sebagai baris tersendiri dan tidak mengubah HPP transaksi penjualan.
+- **Biaya susut**: dari penyesuaian stok, memakai harga aktif bahan saat penyesuaian dicatat, ditampilkan sebagai baris tersendiri dan tidak mengubah HPP transaksi penjualan.
 - **Dasar bagi hasil** = laba yang sudah lunas pada periode - biaya susut - pengeluaran lain (jika ada). Persentase dan pembagiannya dihitung di Excel; gaji tidak dibebankan ke aplikasi.
 - **Arus kas**: uang masuk (tunai, QRIS, pelunasan hutang) dan uang keluar (Stock Masuk dan lainnya).
 - **Kas laci dan QRIS** dihitung dan dicocokkan terpisah.
@@ -245,6 +245,7 @@ Urutan sudah mempertimbangkan ketergantungan. Modul berikutnya baru dimulai sete
 **M8 Penyesuaian stok dan opname**
 
 - Tumpah, kalibrasi, rusak; opname khusus owner; nilai susut.
+- Penyesuaian menu memakai mode makan di tempat/bawa pulang agar kemasan hanya terpotong bila dipakai; opname dapat menaikkan atau menurunkan stok.
 - Bergantung pada: M7.
 
 **M9 Tutup Kasir v2 dan jam otomatis**

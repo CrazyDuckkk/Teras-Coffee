@@ -85,6 +85,20 @@
       "when": 1794471756570,
       "tag": "0011_m7_inventory_role_revokes",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794473075674,
+      "tag": "0012_m8_penyesuaian_stok_opname",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794473089220,
+      "tag": "0013_m8_inventory_role_revokes",
+      "breakpoints": true
     }
   ]
 }
