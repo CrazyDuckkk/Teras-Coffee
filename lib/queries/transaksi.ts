@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import { getRangeLastNDaysWIB } from "@/lib/date";
 import { batalkanHutangSaatVoidTx, pastikanHutangBisaDiajukanVoidTx } from "@/lib/hutang-core";
+import { siapkanPencatatanKasTx } from "@/lib/tutup-kasir-core";
 import type { TransaksiCreateInput } from "@/lib/validations/transaksi";
 import { requireRole } from "@/lib/auth-guard";
 import {
@@ -113,6 +114,7 @@ function hargaAktifSubquery(tx: DbOrTx) {
 export async function createTransaksi(input: TransaksiCreateInput, pelakuId: string) {
   await requireRole("owner", "cashier");
   return db.transaction(async (tx) => {
+    const { timestamp: now, setelahTutup } = await siapkanPencatatanKasTx(tx);
     const menuIds = [...new Set(input.items.map((i) => i.menuId))];
 
     const menuRows = await tx.select().from(menu).where(inArray(menu.id, menuIds));
@@ -196,8 +198,10 @@ export async function createTransaksi(input: TransaksiCreateInput, pelakuId: str
     const [row] = await tx
       .insert(transaksi)
       .values({
+        tanggal: now,
         totalPemasukan: totalPemasukan.toFixed(2),
         metodeBayar: input.metodeBayar,
+        setelahTutup,
         pelakuId,
       })
       .returning();

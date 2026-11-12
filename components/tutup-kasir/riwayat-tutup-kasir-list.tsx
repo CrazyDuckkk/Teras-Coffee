@@ -24,7 +24,14 @@ export function RiwayatTutupKasirList({ data }: { data: Row[] }) {
           <Card key={row.id} className="rounded-xl border-[#E2E8F0] py-3 shadow-[0px_1px_3px_rgba(0,0,0,0.05)]">
             <CardContent className="flex flex-col gap-3 px-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium">{formatTanggalWIB(new Date(`${row.tanggal}T00:00:00`))}</span>
+                <span className="text-sm font-medium">{formatTanggalWIB(new Date(`${row.tanggal}T00:00:00Z`))}</span>
+                <span className="text-xs text-muted-foreground">
+                  {row.statusPenutupan === "otomatis_belum_diverifikasi"
+                    ? "Ditutup otomatis · belum diverifikasi"
+                    : row.statusPenutupan === "manual"
+                      ? `Ditutup manual${row.pelakuNama ? ` oleh ${row.pelakuNama}` : ""}`
+                      : "Data penutupan lama"}
+                </span>
                 {row.menuTerlarisNama && (
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Trophy className="size-3" />
@@ -48,6 +55,18 @@ export function RiwayatTutupKasirList({ data }: { data: Row[] }) {
                     className={cn("font-medium", labaKotor >= 0 ? "text-success-foreground" : "text-danger-foreground")}
                   />
                 </div>
+                {row.statusPenutupan === "manual" && (
+                  <>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-muted-foreground">Selisih Kas</span>
+                      <Currency value={row.selisihKas ?? 0} className="font-medium" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-muted-foreground">Selisih QRIS</span>
+                      <Currency value={row.selisihQris ?? 0} className="font-medium" />
+                    </div>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>

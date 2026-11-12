@@ -1,4 +1,4 @@
-import { check, index, numeric, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, index, numeric, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { hutang } from "./hutang";
 import { user } from "./auth";
@@ -20,6 +20,7 @@ export const hutangPembayaran = pgTable(
       .references(() => hutang.id, { onDelete: "restrict" }),
     jumlah: numeric("jumlah", { precision: 12, scale: 2 }).notNull(),
     metode: metodePembayaranHutangEnum("metode").notNull(),
+    setelahTutup: boolean("setelah_tutup").notNull().default(false),
     dibayarAt: timestamp("dibayar_at", { withTimezone: true }).notNull().defaultNow(),
     // Nullable: pembayaran hasil backfill data lama tidak punya pelaku.
     pelakuId: text("pelaku_id").references(() => user.id, { onDelete: "set null" }),

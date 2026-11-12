@@ -63,6 +63,7 @@ export async function getHutangDetail(id: string) {
         id: hutangPembayaran.id,
         jumlah: hutangPembayaran.jumlah,
         metode: hutangPembayaran.metode,
+        setelahTutup: hutangPembayaran.setelahTutup,
         dibayarAt: hutangPembayaran.dibayarAt,
         dibatalkanAt: hutangPembayaran.dibatalkanAt,
         alasanBatal: hutangPembayaran.alasanBatal,

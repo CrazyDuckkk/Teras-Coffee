@@ -183,6 +183,7 @@ export async function listStockMasuk(bahanBakuId?: string) {
       hargaBeli: stockMasuk.hargaBeli,
       totalPengeluaran: stockMasuk.totalPengeluaran,
       dibayarDari: stockMasuk.dibayarDari,
+      setelahTutup: stockMasuk.setelahTutup,
       statusHarga: stockMasuk.statusHarga,
       pelakuNama: user.name,
       dibatalkanAt: stockMasuk.dibatalkanAt,
@@ -208,6 +209,7 @@ export async function listStockMasukMenungguKonfirmasi() {
       hargaBeli: stockMasuk.hargaBeli,
       totalPengeluaran: stockMasuk.totalPengeluaran,
       dibayarDari: stockMasuk.dibayarDari,
+      setelahTutup: stockMasuk.setelahTutup,
       pelakuNama: user.name,
     })
     .from(stockMasuk)

@@ -122,11 +122,14 @@ export function StockMasukList({ data }: { data: StockMasukRow[] }) {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {row.dibatalkanAt ? (
-                      <Badge variant="destructive">Dikoreksi</Badge>
-                    ) : (
-                      <Badge variant="outline">Aktif</Badge>
-                    )}
+                    <div className="flex flex-wrap gap-1">
+                      {row.dibatalkanAt ? (
+                        <Badge variant="destructive">Dikoreksi</Badge>
+                      ) : (
+                        <Badge variant="outline">Aktif</Badge>
+                      )}
+                      {row.setelahTutup && <Badge variant="outline">Setelah tutup</Badge>}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {row.dibatalkanAt ? null : row.dibayarDari ? (

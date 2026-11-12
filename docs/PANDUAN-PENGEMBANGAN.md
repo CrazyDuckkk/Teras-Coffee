@@ -109,6 +109,10 @@ Untuk M8, penyesuaian menu memakai mode makan di tempat/bawa pulang: bahan kemas
 
 Uji manual M8: sebagai kasir, catat menu tumpah mode makan di tempat dan menu gagal mode bawa pulang; pastikan hanya resep yang sesuai mode terpotong dan kasir tidak menerima nilai susut. Coba kalibrasi, tes rasa, bahan rusak, dan kedaluwarsa dengan alasan. Sebagai owner, lakukan opname dengan stok fisik lebih rendah lalu lebih tinggi; pastikan pengurangan mencatat nilai susut, penambahan tidak, serta endpoint opname menolak kasir.
 
+Untuk M9, kasir memasukkan kas awal, uang fisik, dan total QRIS merchant sebelum melihat hasil rekonsiliasi. Kas diharapkan dihitung dari kas awal + penjualan tunai + pembayaran hutang tunai - Stock Masuk dari kas laci; QRIS membandingkan nilai bruto transaksi dan pembayaran hutang QRIS. Kas awal berikutnya meneruskan saldo penutupan terakhir beserta arus tunai sesudahnya sampai pergantian WIB. Penutupan otomatis memakai Vercel Cron tiap menit dan jam aktif WIB (default 23.59); perubahan jam berlaku besok. Isi `CRON_SECRET` di `.env.local` untuk pengujian lokal dan di Vercel untuk deployment, lalu redeploy. Jangan mengaktifkan endpoint cron tanpa secret.
+
+Uji manual M9: lakukan penutupan manual dan pastikan kas/QRIS serta selisih sesuai hitungan; tutup otomatis pada jam uji dan pastikan status belum diverifikasi tanpa selisih; ubah jam dan pastikan jadwal baru mulai besok; buat penjualan, pembayaran hutang, dan Stock Masuk setelah tutup lalu pastikan penanda "Setelah tutup" tampil dan tanggalnya tetap hari WIB yang sama.
+
 ## 6. Cadangan database
 
 Folder `backups/` diabaikan git. Jangan pernah meng-commit isinya.
@@ -185,4 +189,5 @@ Status modul:
 | M6 Hutang dan pembayaran sebagian      | Kode dan tes otomatis lulus; menunggu uji manual |
 | M7 Stok Bahan dan Stock Masuk           | Kode dan tes otomatis lulus; menunggu uji manual |
 | M8 Penyesuaian stok dan opname          | Kode dan tes otomatis lulus; menunggu uji manual |
-| M9 sampai M12                           | Belum dimulai                                   |
+| M9 Tutup Kasir v2 dan jam otomatis      | Kode dan tes otomatis lulus; menunggu uji manual |
+| M10 sampai M12                          | Belum dimulai                                   |

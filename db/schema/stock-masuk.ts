@@ -1,4 +1,4 @@
-import { index, numeric, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, numeric, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { bahanBaku } from "./bahan-baku";
 import { user } from "./auth";
 
@@ -25,6 +25,7 @@ export const stockMasuk = pgTable(
     hargaBeli: numeric("harga_beli", { precision: 12, scale: 2 }).notNull(),
     totalPengeluaran: numeric("total_pengeluaran", { precision: 12, scale: 2 }).notNull(),
     dibayarDari: sumberBayarStockMasukEnum("dibayar_dari"),
+    setelahTutup: boolean("setelah_tutup").notNull().default(false),
     statusHarga: statusHargaStockMasukEnum("status_harga").notNull().default("disetujui"),
     pelakuId: text("pelaku_id").references(() => user.id, { onDelete: "set null" }),
     konfirmasiHargaAt: timestamp("konfirmasi_harga_at", { withTimezone: true }),

@@ -48,7 +48,11 @@ Aplikasi web untuk operasional kedai kopi, dibuat dengan Next.js, Drizzle ORM, P
 
 ## Tutup Kasir dan Laporan
 
-- Tutup kasir menyimpan ringkasan harian sekali per tanggal WIB; permintaan bersamaan juga ditolak sebagai penutupan duplikat.
+- Tutup kasir menggunakan hitung buta untuk kas fisik dan total QRIS merchant; setelah disimpan, sistem menampilkan kas/QRIS yang diharapkan dan selisihnya.
+- Penutupan otomatis berjalan pada jam WIB yang diatur owner (default 23.59), berstatus belum diverifikasi, dan tidak mencatat selisih.
+- Penjualan, pembayaran hutang, dan Stock Masuk setelah tutup tetap memakai tanggal WIB hari itu serta ditandai "Setelah tutup".
+- Kas awal berikutnya melanjutkan saldo penutupan terakhir beserta arus tunai setelah tutup sampai pergantian hari.
+- Tutup kasir hanya dapat disimpan sekali per tanggal WIB; transaksi setelah penutupan tetap diperbolehkan.
 - Filter laporan harian memakai hari WIB, mingguan memakai minggu berjalan (Senin–Senin), dan bulanan memakai bulan kalender berjalan.
 - Menu terlaris dihitung dari transaksi aktif; void dikecualikan. Laba-rugi mengikuti arus kas yang tercatat pada periode tersebut.
 

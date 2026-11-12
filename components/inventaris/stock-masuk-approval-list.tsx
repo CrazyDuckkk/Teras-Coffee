@@ -83,6 +83,7 @@ export function StockMasukApprovalList({ data }: { data: StockMasukMenunggu[] })
                   <span className="text-xs text-muted-foreground">
                     Dibayar dari {row.dibayarDari === "kas_laci" ? "kas laci" : "luar laci"}; dicatat oleh{" "}
                     {row.pelakuNama ?? "akun yang tidak diketahui"} pada {formatTanggalWaktuWIB(new Date(row.tanggal))}
+                    {row.setelahTutup ? " · Setelah tutup" : ""}
                   </span>
                 </div>
                 <div className="flex shrink-0 gap-2">

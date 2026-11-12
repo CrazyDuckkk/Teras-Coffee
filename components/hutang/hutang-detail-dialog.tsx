@@ -148,6 +148,7 @@ export function HutangDetailDialog({
                     <span className="text-xs text-muted-foreground">
                       {formatTanggalWaktuWIB(new Date(p.dibayarAt))}
                       {p.pelakuNama ? ` · ${p.pelakuNama}` : ""}
+                      {p.setelahTutup ? " · Setelah tutup" : ""}
                     </span>
                     {p.dibatalkanAt && (
                       <span className="text-xs text-muted-foreground">

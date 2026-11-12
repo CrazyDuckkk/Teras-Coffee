@@ -101,6 +101,7 @@ export function RiwayatTransaksi({
                   <Badge variant="outline">
                     {t.metodeBayar === "qris" ? "QRIS" : t.metodeBayar === "hutang" ? "Hutang" : "Tunai"}
                   </Badge>
+                  {t.setelahTutup && <Badge variant="outline">Setelah tutup</Badge>}
                 </div>
                 <span className="text-xs text-muted-foreground">
                   {t.items

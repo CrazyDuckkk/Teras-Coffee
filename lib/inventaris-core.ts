@@ -15,6 +15,7 @@ import type {
   StockMasukCreateInput,
 } from "@/lib/validations/inventaris";
 import type { UserRole } from "@/lib/roles";
+import { siapkanPencatatanKasTx } from "@/lib/tutup-kasir-core";
 
 export type InventarisDbOrTx = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -279,8 +280,9 @@ export async function catatStockMasukTx(
   input: StockMasukCreateInput,
   pelakuId: string,
   role: UserRole,
-  now: Date = new Date()
+  now?: Date
 ) {
+  const { timestamp: waktuMasuk, setelahTutup } = await siapkanPencatatanKasTx(tx, now);
   const [bahan] = await tx
     .select()
     .from(bahanBaku)
@@ -299,15 +301,17 @@ export async function catatStockMasukTx(
   const [entry] = await tx
     .insert(stockMasuk)
     .values({
+      tanggal: waktuMasuk,
       bahanBakuId: input.bahanBakuId,
       qty: input.qty.toFixed(2),
       hargaBeli: hargaPerSatuan.toFixed(2),
       totalPengeluaran: input.totalHargaBeli.toFixed(2),
       dibayarDari: input.dibayarDari,
+      setelahTutup,
       statusHarga: menungguKonfirmasi ? "menunggu" : "disetujui",
       pelakuId,
       ...(role === "owner" && {
-        konfirmasiHargaAt: now,
+        konfirmasiHargaAt: waktuMasuk,
         konfirmasiHargaOleh: pelakuId,
       }),
     })
@@ -317,12 +321,12 @@ export async function catatStockMasukTx(
     .update(bahanBaku)
     .set({
       stokSaatIni: sql`${bahanBaku.stokSaatIni} + ${input.qty.toFixed(2)}`,
-      updatedAt: now,
+      updatedAt: waktuMasuk,
     })
     .where(eq(bahanBaku.id, input.bahanBakuId));
 
   if (!menungguKonfirmasi && hargaBerubah) {
-    await catatRiwayatHarga(tx, entry.id, input.bahanBakuId, hargaPerSatuan.toFixed(2), now);
+    await catatRiwayatHarga(tx, entry.id, input.bahanBakuId, hargaPerSatuan.toFixed(2), waktuMasuk);
   }
 
   return entry;

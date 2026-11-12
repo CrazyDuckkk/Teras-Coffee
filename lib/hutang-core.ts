@@ -1,6 +1,7 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type { db } from "@/db";
 import { hutang, hutangPembayaran, transaksi } from "@/db/schema";
+import { siapkanPencatatanKasTx } from "@/lib/tutup-kasir-core";
 import type { PembayaranHutangInput } from "@/lib/validations/hutang";
 
 /**
@@ -92,7 +93,7 @@ export async function catatPembayaranTx(
   hutangId: string,
   input: PembayaranHutangInput,
   pelakuId: string | null,
-  now: Date = new Date(),
+  now?: Date,
 ) {
   const kunci = await kunciHutang(tx, hutangId);
   if (!kunci) return null;
@@ -105,6 +106,7 @@ export async function catatPembayaranTx(
 
   const jumlahSen = toSen(input.jumlah);
   if (jumlahSen > sisaSen) throw new PembayaranMelebihiSisaError(sisaSen / 100);
+  const { timestamp: waktuPembayaran, setelahTutup } = await siapkanPencatatanKasTx(tx, now);
 
   const [pembayaran] = await tx
     .insert(hutangPembayaran)
@@ -112,7 +114,8 @@ export async function catatPembayaranTx(
       hutangId,
       jumlah: fromSen(jumlahSen),
       metode: input.metode,
-      dibayarAt: now,
+      dibayarAt: waktuPembayaran,
+      setelahTutup,
       pelakuId,
     })
     .returning();
@@ -123,7 +126,7 @@ export async function catatPembayaranTx(
     // Tanggal lunas = tanggal pembayaran terakhir (laba diakui pada tanggal ini, lihat M10).
     [hutangRow] = await tx
       .update(hutang)
-      .set({ status: "lunas", tanggalLunas: now })
+      .set({ status: "lunas", tanggalLunas: waktuPembayaran })
       .where(eq(hutang.id, hutangId))
       .returning();
   }

@@ -99,6 +99,13 @@
       "when": 1794473089220,
       "tag": "0013_m8_inventory_role_revokes",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794474880764,
+      "tag": "0014_striped_the_spike",
+      "breakpoints": true
     }
   ]
 }
