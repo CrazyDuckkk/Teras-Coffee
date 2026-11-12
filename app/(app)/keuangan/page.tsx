@@ -1,12 +1,14 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { PeriodeLaporanFilter } from "@/components/keuangan/periode-filter";
 import { LaporanTabs } from "@/components/keuangan/laporan-tabs";
+import { RiwayatEksporList } from "@/components/keuangan/riwayat-ekspor-list";
 import { TutupKasirPanel } from "@/components/tutup-kasir/tutup-kasir-panel";
 import {
   getKasAwalTutupKasir,
   getTutupKasirHariIni,
 } from "@/lib/queries/tutup-kasir";
 import { getLaporanKeuangan } from "@/lib/queries/laporan-keuangan";
+import { listRiwayatEksporLaporan } from "@/lib/queries/ekspor-laporan";
 import { buatRentangLaporan, type PeriodeLaporan } from "@/lib/laporan-keuangan-core";
 import { requireRole } from "@/lib/auth-guard";
 
@@ -26,16 +28,22 @@ export default async function KeuanganPage({
   const range = buatRentangLaporan(periode, tanggal);
   const activeTab = params.tab && VALID_TAB.includes(params.tab) ? params.tab : "ringkasan";
 
-  const [data, penutupan, kasAwalSaran] = await Promise.all([
+  const [data, penutupan, kasAwalSaran, riwayatEkspor] = await Promise.all([
     getLaporanKeuangan(range),
     getTutupKasirHariIni(),
     getKasAwalTutupKasir(),
+    listRiwayatEksporLaporan(),
   ]);
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Keuangan" description="Ringkasan, buku kas, kas harian, dan laporan terpadu" />
-      <PeriodeLaporanFilter periode={periode} tanggal={range.tanggalAcuan} />
+      <PeriodeLaporanFilter
+        periode={periode}
+        tanggal={range.tanggalAcuan}
+        tanggalMulai={range.tanggalMulai}
+        tanggalAkhir={range.tanggalAkhir}
+      />
       <p className="text-sm text-muted-foreground">
         Periode WIB: {range.tanggalMulai} sampai {range.tanggalAkhir}
       </p>
@@ -44,6 +52,7 @@ export default async function KeuanganPage({
         activeTab={activeTab}
         tutupKasirPanel={<TutupKasirPanel penutupan={penutupan} kasAwalSaran={kasAwalSaran} />}
       />
+      <RiwayatEksporList data={riwayatEkspor} />
     </div>
   );
 }

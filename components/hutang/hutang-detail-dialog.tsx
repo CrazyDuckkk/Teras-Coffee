@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Currency } from "@/components/shared/currency";
 import { formatTanggalWaktuWIB } from "@/lib/date";
+import { tampilkanPeringatanEkspor } from "@/components/keuangan/export-warning";
 import type { getHutangDetail } from "@/lib/queries/hutang";
 import type { UserRole } from "@/lib/roles";
 
@@ -49,6 +50,7 @@ export function HutangDetailDialog({
         return;
       }
       toast.success("Pembayaran dibatalkan");
+      tampilkanPeringatanEkspor(json.peringatanEkspor);
       setBatalId(null);
       setAlasan("");
       onBerubah();

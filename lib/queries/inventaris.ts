@@ -346,12 +346,20 @@ export async function listRiwayatPenyesuaianStok(): Promise<RiwayatPenyesuaianSt
   }));
 }
 
-export async function catatPenyesuaianStok(input: PenyesuaianStokCreateInput, pelakuId: string) {
+export async function catatPenyesuaianStok(
+  input: PenyesuaianStokCreateInput,
+  pelakuId: string,
+  now: Date = new Date(),
+) {
   await requireRole("owner", "cashier");
-  return db.transaction((tx) => catatPenyesuaianStokTx(tx, input, pelakuId));
+  return db.transaction((tx) => catatPenyesuaianStokTx(tx, input, pelakuId, now));
 }
 
-export async function catatOpnameStok(input: OpnameStokInput, pelakuId: string) {
+export async function catatOpnameStok(
+  input: OpnameStokInput,
+  pelakuId: string,
+  now: Date = new Date(),
+) {
   await requireRole("owner");
-  return db.transaction((tx) => catatOpnameStokTx(tx, input, pelakuId));
+  return db.transaction((tx) => catatOpnameStokTx(tx, input, pelakuId, now));
 }

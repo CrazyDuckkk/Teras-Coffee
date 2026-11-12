@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatTanggalWaktuWIB } from "@/lib/date";
+import { tampilkanPeringatanEkspor } from "@/components/keuangan/export-warning";
 import type { listStockMasukMenungguKonfirmasi } from "@/lib/queries/inventaris";
 
 type StockMasukMenunggu = Awaited<ReturnType<typeof listStockMasukMenungguKonfirmasi>>[number];
@@ -48,6 +49,7 @@ export function StockMasukApprovalList({ data }: { data: StockMasukMenunggu[] })
           ? "Harga disetujui dan berlaku untuk HPP berikutnya."
           : "Harga ditolak; harga aktif tetap digunakan."
       );
+      tampilkanPeringatanEkspor(result.peringatanEkspor);
       setTarget(null);
       router.refresh();
     } catch {

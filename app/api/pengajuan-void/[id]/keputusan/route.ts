@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { db } from "@/db";
 import { requireApiRole } from "@/lib/auth-guard";
 import { HutangSudahLunasError } from "@/lib/queries/hutang";
 import {
   PengajuanVoidSudahDiprosesError,
   putuskanPengajuanVoid,
 } from "@/lib/queries/transaksi";
+import {
+  getTanggalDampakPengajuanVoidCore,
+  getPeringatanEksporUntukTanggalCore,
+} from "@/lib/laporan-ekspor-core";
 import { keputusanVoidSchema } from "@/lib/validations/transaksi";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -25,9 +30,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   try {
+    const tanggalDampak = parsed.data.keputusan === "setujui"
+      ? await getTanggalDampakPengajuanVoidCore(id, db)
+      : [];
+    const peringatanEkspor = await getPeringatanEksporUntukTanggalCore(tanggalDampak, db);
     const row = await putuskanPengajuanVoid(id, parsed.data.keputusan, access.session.user.id);
     if (!row) return NextResponse.json({ error: "Pengajuan void tidak ditemukan" }, { status: 404 });
-    return NextResponse.json({ data: row });
+    return NextResponse.json({ data: row, peringatanEkspor });
   } catch (err) {
     if (err instanceof PengajuanVoidSudahDiprosesError || err instanceof HutangSudahLunasError) {
       return NextResponse.json({ error: err.message }, { status: 409 });

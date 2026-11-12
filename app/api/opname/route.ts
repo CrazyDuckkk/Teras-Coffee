@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { db } from "@/db";
 import { requireApiRole } from "@/lib/auth-guard";
 import {
   BahanPenyesuaianTidakDitemukanError,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/inventaris-core";
 import { catatOpnameStok } from "@/lib/queries/inventaris";
 import { opnameStokSchema } from "@/lib/validations/inventaris";
+import { getPeringatanEksporUntukTanggalCore } from "@/lib/laporan-ekspor-core";
 
 export async function POST(request: Request) {
   const access = await requireApiRole("owner");
@@ -26,8 +28,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const row = await catatOpnameStok(parsed.data, access.session.user.id);
-    return NextResponse.json({ data: { id: row.id, jenis: row.jenis } }, { status: 201 });
+    const now = new Date();
+    const peringatanEkspor = await getPeringatanEksporUntukTanggalCore([now], db);
+    const row = await catatOpnameStok(parsed.data, access.session.user.id, now);
+    return NextResponse.json({ data: { id: row.id, jenis: row.jenis }, peringatanEkspor }, { status: 201 });
   } catch (error) {
     if (error instanceof BahanPenyesuaianTidakDitemukanError) {
       return NextResponse.json({ error: error.message }, { status: 404 });

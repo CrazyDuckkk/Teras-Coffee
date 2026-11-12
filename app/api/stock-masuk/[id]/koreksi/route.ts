@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { db } from "@/db";
 import { requireApiRole } from "@/lib/auth-guard";
 import { koreksiStockMasuk } from "@/lib/queries/inventaris";
 import {
@@ -8,6 +9,10 @@ import {
   StokTidakCukupUntukKoreksiError,
 } from "@/lib/inventaris-core";
 import { koreksiStockMasukSchema } from "@/lib/validations/inventaris";
+import {
+  getPeringatanEksporUntukTanggalCore,
+  getTanggalStockMasukCore,
+} from "@/lib/laporan-ekspor-core";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const access = await requireApiRole("owner");
@@ -30,9 +35,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   try {
+    const tanggal = await getTanggalStockMasukCore(id, db);
+    const peringatanEkspor = tanggal
+      ? await getPeringatanEksporUntukTanggalCore([tanggal], db)
+      : [];
     const row = await koreksiStockMasuk(id, parsed.data.alasan, access.session.user.id);
     if (!row) return NextResponse.json({ error: "Stock Masuk tidak ditemukan" }, { status: 404 });
-    return NextResponse.json({ data: row });
+    return NextResponse.json({ data: row, peringatanEkspor });
   } catch (error) {
     if (
       error instanceof StockMasukLegacyTidakDapatDikoreksiError ||

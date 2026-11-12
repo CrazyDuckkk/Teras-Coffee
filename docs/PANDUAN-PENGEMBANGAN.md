@@ -117,7 +117,9 @@ Untuk M10, halaman Keuangan menyatukan Ringkasan, Buku Kas, Kas Harian, dan Lapo
 
 Uji manual M10: pilih minggu dan bulan berbeda, cocokkan penjualan per metode dengan transaksi; pastikan pembayaran hutang hanya masuk arus kas pada tanggal bayar dan labanya baru muncul setelah lunas; cocokkan biaya susut, piutang akhir periode, selisih kas/QRIS, status tutup otomatis, serta tabel Performa Menu.
 
-M11 menambahkan ekspor Excel enam sheet, catatan siapa/kapan/periode ekspor, dan peringatan jika void atau koreksi mengubah periode yang pernah diekspor.
+M11 menambahkan ekspor Excel enam sheet, catatan siapa/kapan/periode ekspor, serta peringatan saat void atau koreksi mengubah periode yang pernah diekspor. Tes otomatis mencakup struktur workbook, rumus bagi hasil, dan pencocokan rentang peringatan.
+
+Uji manual M11: sebagai owner, ekspor laporan mingguan dan bulanan; pastikan keenam sheet, angka/tanggal, rumus dasar bagi hasil, dan riwayat nama file/waktu/pelaku sesuai. Ubah data pada periode yang sudah diekspor melalui void atau koreksi dan pastikan peringatan tampil; perubahan di luar periode tidak boleh memberi peringatan. Pastikan kasir tidak dapat membuka riwayat maupun endpoint ekspor.
 
 ## 6. Cadangan database
 

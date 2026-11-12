@@ -3,14 +3,19 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { ExportExcelButton } from "@/components/keuangan/export-excel-button";
 import type { PeriodeLaporan } from "@/lib/laporan-keuangan-core";
 
 export function PeriodeLaporanFilter({
   periode,
   tanggal,
+  tanggalMulai,
+  tanggalAkhir,
 }: {
   periode: PeriodeLaporan;
   tanggal: string;
+  tanggalMulai: string;
+  tanggalAkhir: string;
 }) {
   const router = useRouter();
   const [selectedPeriode, setSelectedPeriode] = useState(periode);
@@ -56,6 +61,12 @@ export function PeriodeLaporanFilter({
         />
       </label>
       <Button type="submit" variant="outline">Tampilkan</Button>
+      <ExportExcelButton
+        periode={periode}
+        tanggal={tanggal}
+        tanggalMulai={tanggalMulai}
+        tanggalAkhir={tanggalAkhir}
+      />
     </form>
   );
 }

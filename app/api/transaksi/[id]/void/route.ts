@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { db } from "@/db";
 import { requireApiRole } from "@/lib/auth-guard";
+import {
+  getPeringatanEksporUntukTanggalCore,
+  getTanggalDampakVoidCore,
+} from "@/lib/laporan-ekspor-core";
 import {
   PengajuanVoidSedangMenungguError,
   TransaksiSudahVoidError,
@@ -26,9 +31,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   try {
+    const tanggalDampak = await getTanggalDampakVoidCore(id, db);
+    const peringatanEkspor = await getPeringatanEksporUntukTanggalCore(tanggalDampak, db);
     const row = await voidTransaksi(id, parsed.data.alasan, access.session.user.id);
     if (!row) return NextResponse.json({ error: "Transaksi tidak ditemukan" }, { status: 404 });
-    return NextResponse.json({ data: row });
+    return NextResponse.json({ data: row, peringatanEkspor });
   } catch (err) {
     if (
       err instanceof TransaksiSudahVoidError ||

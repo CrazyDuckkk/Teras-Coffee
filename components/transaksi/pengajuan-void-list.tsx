@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Currency } from "@/components/shared/currency";
 import { formatTanggalWaktuWIB } from "@/lib/date";
+import { tampilkanPeringatanEkspor } from "@/components/keuangan/export-warning";
 import type { listPengajuanVoidMenunggu } from "@/lib/queries/transaksi";
 
 type PengajuanVoidRow = Awaited<ReturnType<typeof listPengajuanVoidMenunggu>>[number];
@@ -48,6 +49,7 @@ export function PengajuanVoidList({ data }: { data: PengajuanVoidRow[] }) {
           ? "Pengajuan disetujui, transaksi di-void dan stok dikembalikan"
           : "Pengajuan ditolak, transaksi kembali aktif"
       );
+      tampilkanPeringatanEkspor(result.peringatanEkspor);
       setTarget(null);
       router.refresh();
     } catch {

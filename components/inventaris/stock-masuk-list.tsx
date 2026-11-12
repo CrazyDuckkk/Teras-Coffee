@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatTanggalWaktuWIB } from "@/lib/date";
+import { tampilkanPeringatanEkspor } from "@/components/keuangan/export-warning";
 import type { listStockMasuk } from "@/lib/queries/inventaris";
 
 type StockMasukRow = Awaited<ReturnType<typeof listStockMasuk>>[number];
@@ -52,6 +53,7 @@ export function StockMasukList({ data }: { data: StockMasukRow[] }) {
       }
 
       toast.success("Stock Masuk dibatalkan. Catat ulang dengan nilai yang benar.");
+      tampilkanPeringatanEkspor(result.peringatanEkspor);
       setTarget(null);
       setAlasan("");
       router.refresh();

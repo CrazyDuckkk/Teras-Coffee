@@ -10,6 +10,7 @@ export async function kosongkanDatabase() {
 
   await db.execute(sql.raw(`
     TRUNCATE TABLE
+      public.ekspor_laporan,
       public.account,
       public.session,
       public.verification,

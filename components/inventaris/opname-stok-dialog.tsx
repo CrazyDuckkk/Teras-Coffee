@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { tampilkanPeringatanEkspor } from "@/components/keuangan/export-warning";
 import type { listStokBahan } from "@/lib/queries/inventaris";
 
 type BahanBaku = Awaited<ReturnType<typeof listStokBahan>>[number];
@@ -60,6 +61,7 @@ export function OpnameStokDialog({
       }
 
       toast.success("Hasil opname berhasil dicatat");
+      tampilkanPeringatanEkspor(result.peringatanEkspor);
       resetForm();
       onOpenChange(false);
       router.refresh();

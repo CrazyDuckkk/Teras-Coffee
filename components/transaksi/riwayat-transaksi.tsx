@@ -21,6 +21,7 @@ import {
 import { Currency } from "@/components/shared/currency";
 import { Textarea } from "@/components/ui/textarea";
 import { formatTanggalWaktuWIB } from "@/lib/date";
+import { tampilkanPeringatanEkspor } from "@/components/keuangan/export-warning";
 import type { listTransaksiTujuhHari } from "@/lib/queries/transaksi";
 
 type TransaksiRow = Awaited<ReturnType<typeof listTransaksiTujuhHari>>[number];
@@ -61,6 +62,7 @@ export function RiwayatTransaksi({
           ? "Transaksi berhasil di-void, stok dikembalikan"
           : "Pengajuan void dikirim ke owner"
       );
+      tampilkanPeringatanEkspor(json.peringatanEkspor);
       setVoidTarget(null);
       setAlasan("");
       router.refresh();

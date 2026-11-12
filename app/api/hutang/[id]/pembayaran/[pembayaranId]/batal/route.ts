@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { db } from "@/db";
 import { requireApiRole } from "@/lib/auth-guard";
 import { batalkanPembayaran, PembayaranSudahDibatalkanError } from "@/lib/queries/hutang";
 import { batalPembayaranSchema } from "@/lib/validations/hutang";
+import {
+  getPeringatanEksporUntukTanggalCore,
+  getTanggalDampakPembatalanHutangCore,
+} from "@/lib/laporan-ekspor-core";
 
 // Pembatalan pembayaran hanya untuk owner (spesifikasi v2, bagian 3.3).
 export async function POST(
@@ -29,9 +34,11 @@ export async function POST(
   }
 
   try {
+    const tanggalDampak = await getTanggalDampakPembatalanHutangCore(id, pembayaranId, db);
+    const peringatanEkspor = await getPeringatanEksporUntukTanggalCore(tanggalDampak, db);
     const result = await batalkanPembayaran(id, pembayaranId, parsed.data.alasan, access.session.user.id);
     if (!result) return NextResponse.json({ error: "Pembayaran tidak ditemukan" }, { status: 404 });
-    return NextResponse.json({ data: result });
+    return NextResponse.json({ data: result, peringatanEkspor });
   } catch (err) {
     if (err instanceof PembayaranSudahDibatalkanError) {
       return NextResponse.json({ error: err.message }, { status: 409 });
