@@ -23,4 +23,13 @@ ALTER TABLE "transaksi" ADD CONSTRAINT "transaksi_voided_by_user_id_fk" FOREIGN 
 --> statement-breakpoint
 ALTER TABLE "public"."pengajuan_void" ENABLE ROW LEVEL SECURITY;
 --> statement-breakpoint
-REVOKE ALL ON TABLE "public"."pengajuan_void" FROM anon, authenticated;
+DO $$
+BEGIN
+  IF to_regrole('anon') IS NOT NULL THEN
+    EXECUTE 'REVOKE ALL ON TABLE public.pengajuan_void FROM anon';
+  END IF;
+  IF to_regrole('authenticated') IS NOT NULL THEN
+    EXECUTE 'REVOKE ALL ON TABLE public.pengajuan_void FROM authenticated';
+  END IF;
+END
+$$;

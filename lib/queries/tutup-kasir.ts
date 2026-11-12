@@ -1,6 +1,6 @@
-import { and, desc, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 import { db } from "@/db";
-import { detailTransaksi, hutang, menu, stockMasuk, transaksi, tutupKasir } from "@/db/schema";
+import { detailTransaksi, hutangPembayaran, menu, stockMasuk, transaksi, tutupKasir } from "@/db/schema";
 import { getTodayDateStringWIB, getTodayRangeWIB } from "@/lib/date";
 import { requireRole } from "@/lib/auth-guard";
 
@@ -21,8 +21,8 @@ export interface RingkasanHarian {
 /**
  * Ringkasan transaksi yang belum di-void + stock masuk hari ini (WIB), dihitung live (belum tersimpan).
  * totalPenjualan/labaKotor di sini adalah angka CASH-FLOW (selaras dengan "saldo" di modul
- * Keuangan): transaksi TUNAI/QRIS hari ini + hutang yang dilunasi hari ini (walau transaksi
- * hutangnya sendiri terjadi di hari lain) — hutang yang belum lunas TIDAK ikut dihitung.
+ * Keuangan): transaksi TUNAI/QRIS hari ini + pembayaran hutang yang diterima hari ini (walau
+ * transaksi hutangnya terjadi di hari lain) — sisa hutang yang belum dibayar TIDAK ikut dihitung.
  * BEDA dari "Laba Kotor" di Dashboard yang berbasis margin per item (hargaJual - hpp) atas
  * SEMUA penjualan aktif hari ini (termasuk hutang yang belum lunas — barang sudah keluar).
  * menuTerlaris juga dihitung dari semua penjualan yang belum di-void hari ini, bukan cuma yang tunai.
@@ -36,7 +36,7 @@ export async function getRingkasanHarian(now: Date = new Date()): Promise<Ringka
 async function calculateRingkasanHarian(now: Date): Promise<RingkasanHarian> {
   const { start, end } = getTodayRangeWIB(now);
 
-  const [transaksiHariIni, transaksiTunaiHariIni, hutangLunasHariIni, stockMasukHariIni] = await Promise.all([
+  const [transaksiHariIni, transaksiTunaiHariIni, pembayaranHutangHariIni, stockMasukHariIni] = await Promise.all([
     db
       .select()
       .from(transaksi)
@@ -59,9 +59,9 @@ async function calculateRingkasanHarian(now: Date): Promise<RingkasanHarian> {
         )
       ),
     db
-      .select({ jumlah: hutang.jumlah })
-      .from(hutang)
-      .where(and(eq(hutang.status, "lunas"), isNotNull(hutang.tanggalLunas), gte(hutang.tanggalLunas, start), lt(hutang.tanggalLunas, end))),
+      .select({ jumlah: hutangPembayaran.jumlah })
+      .from(hutangPembayaran)
+      .where(and(isNull(hutangPembayaran.dibatalkanAt), gte(hutangPembayaran.dibayarAt, start), lt(hutangPembayaran.dibayarAt, end))),
     db
       .select({ totalPengeluaran: stockMasuk.totalPengeluaran })
       .from(stockMasuk)
@@ -70,7 +70,7 @@ async function calculateRingkasanHarian(now: Date): Promise<RingkasanHarian> {
 
   const totalPenjualan =
     transaksiTunaiHariIni.reduce((sum, t) => sum + Number(t.totalPemasukan), 0) +
-    hutangLunasHariIni.reduce((sum, h) => sum + Number(h.jumlah), 0);
+    pembayaranHutangHariIni.reduce((sum, h) => sum + Number(h.jumlah), 0);
   const totalPengeluaran = stockMasukHariIni.reduce((sum, s) => sum + Number(s.totalPengeluaran), 0);
 
   let menuTerlaris: RingkasanHarian["menuTerlaris"] = null;
@@ -110,7 +110,7 @@ export async function getRingkasanKasir(now: Date = new Date()) {
   await requireRole("owner", "cashier");
   const { start, end } = getTodayRangeWIB(now);
 
-  const [tunai, hutangLunas] = await Promise.all([
+  const [tunai, pembayaranHutang] = await Promise.all([
     db
       .select({ total: transaksi.totalPemasukan })
       .from(transaksi)
@@ -123,14 +123,13 @@ export async function getRingkasanKasir(now: Date = new Date()) {
         ),
       ),
     db
-      .select({ total: hutang.jumlah })
-      .from(hutang)
+      .select({ total: hutangPembayaran.jumlah })
+      .from(hutangPembayaran)
       .where(
         and(
-          eq(hutang.status, "lunas"),
-          isNotNull(hutang.tanggalLunas),
-          gte(hutang.tanggalLunas, start),
-          lt(hutang.tanggalLunas, end),
+          isNull(hutangPembayaran.dibatalkanAt),
+          gte(hutangPembayaran.dibayarAt, start),
+          lt(hutangPembayaran.dibayarAt, end),
         ),
       ),
   ]);
@@ -138,7 +137,7 @@ export async function getRingkasanKasir(now: Date = new Date()) {
   return {
     totalPenjualan:
       tunai.reduce((sum, row) => sum + Number(row.total), 0) +
-      hutangLunas.reduce((sum, row) => sum + Number(row.total), 0),
+      pembayaranHutang.reduce((sum, row) => sum + Number(row.total), 0),
   };
 }
 

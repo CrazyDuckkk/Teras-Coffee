@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiRole } from "@/lib/auth-guard";
-import { HutangSudahLunasError } from "@/lib/queries/hutang";
+import { HutangSudahAdaPembayaranError } from "@/lib/queries/hutang";
 import {
   ajukanVoidTransaksi,
   TransaksiTidakDapatDiajukanVoidError,
@@ -29,7 +29,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!row) return NextResponse.json({ error: "Transaksi tidak ditemukan" }, { status: 404 });
     return NextResponse.json({ data: row }, { status: 201 });
   } catch (err) {
-    if (err instanceof TransaksiTidakDapatDiajukanVoidError || err instanceof HutangSudahLunasError) {
+    if (err instanceof TransaksiTidakDapatDiajukanVoidError || err instanceof HutangSudahAdaPembayaranError) {
       return NextResponse.json({ error: err.message }, { status: 409 });
     }
     console.error(err);

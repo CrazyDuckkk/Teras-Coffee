@@ -4,13 +4,13 @@ import { HutangList } from "@/components/hutang/hutang-list";
 import { requireRole } from "@/lib/auth-guard";
 
 export default async function HutangPage() {
-  await requireRole("owner", "cashier");
+  const session = await requireRole("owner", "cashier");
   const data = await listHutang();
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Hutang" description="Piutang pelanggan dari transaksi metode Hutang" />
-      <HutangList data={data} />
+      <HutangList data={data} peran={session.user.role} />
     </div>
   );
 }

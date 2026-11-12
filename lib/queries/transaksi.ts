@@ -13,7 +13,7 @@ import {
   user,
 } from "@/db/schema";
 import { getRangeLastNDaysWIB } from "@/lib/date";
-import { HutangSudahLunasError } from "@/lib/queries/hutang";
+import { batalkanHutangSaatVoidTx, pastikanHutangBisaDiajukanVoidTx } from "@/lib/hutang-core";
 import type { TransaksiCreateInput } from "@/lib/validations/transaksi";
 import { requireRole } from "@/lib/auth-guard";
 import {
@@ -212,7 +212,7 @@ export async function createTransaksi(input: TransaksiCreateInput, pelakuId: str
       }
     }
 
-    // Hutang belum masuk Keuangan sampai ditandai lunas (lihat lib/queries/hutang.ts) — stok
+    // Hutang baru masuk Keuangan lewat pembayaran (lihat lib/hutang-core.ts) — stok
     // sudah dipotong di atas seperti biasa, barang sudah keluar terlepas dari metode bayar.
     if (input.metodeBayar === "hutang") {
       await tx.insert(hutang).values({
@@ -239,10 +239,10 @@ async function applyVoid(
     throw new TransaksiTidakDapatDiajukanVoidError();
   }
 
+  // Void hanya sampai sini lewat owner (void langsung atau persetujuan). Jika hutang sudah ada
+  // pembayarannya, pembayaran dibatalkan otomatis dan jejaknya tetap ada (lihat hutang-core.ts).
   if (row.metodeBayar === "hutang") {
-    const [hutangRow] = await tx.select().from(hutang).where(eq(hutang.transaksiId, id)).for("update");
-    if (hutangRow?.status === "lunas") throw new HutangSudahLunasError();
-    if (hutangRow) await tx.delete(hutang).where(eq(hutang.id, hutangRow.id));
+    await batalkanHutangSaatVoidTx(tx, id, voidedBy);
   }
 
   const details = await tx.select().from(detailTransaksi).where(eq(detailTransaksi.transaksiId, id));
@@ -292,9 +292,9 @@ export async function ajukanVoidTransaksi(id: string, alasan: string, pelakuId: 
     if (!row) return null;
     if (row.status !== "aktif") throw new TransaksiTidakDapatDiajukanVoidError();
 
+    // Hutang yang sudah ada pembayarannya tidak bisa diajukan void oleh kasir (ditangani owner).
     if (row.metodeBayar === "hutang") {
-      const [hutangRow] = await tx.select().from(hutang).where(eq(hutang.transaksiId, id)).for("update");
-      if (hutangRow?.status === "lunas") throw new HutangSudahLunasError();
+      await pastikanHutangBisaDiajukanVoidTx(tx, id);
     }
 
     const [request] = await tx

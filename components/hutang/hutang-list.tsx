@@ -7,64 +7,45 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Currency } from "@/components/shared/currency";
 import { formatTanggalWaktuWIB } from "@/lib/date";
 import { HutangDetailDialog } from "./hutang-detail-dialog";
+import { PembayaranHutangDialog } from "./pembayaran-hutang-dialog";
 import type { listHutang, getHutangDetail } from "@/lib/queries/hutang";
+import type { UserRole } from "@/lib/roles";
 
 type HutangRow = Awaited<ReturnType<typeof listHutang>>[number];
 type HutangDetail = NonNullable<Awaited<ReturnType<typeof getHutangDetail>>>;
 
-export function HutangList({ data }: { data: HutangRow[] }) {
+export function HutangList({ data, peran }: { data: HutangRow[]; peran: UserRole }) {
   const router = useRouter();
   const [tab, setTab] = useState<"belum_lunas" | "lunas">("belum_lunas");
-  const [lunasTarget, setLunasTarget] = useState<HutangRow | null>(null);
-  const [loadingLunas, setLoadingLunas] = useState(false);
+  const [bayarTarget, setBayarTarget] = useState<HutangRow | null>(null);
   const [detailFor, setDetailFor] = useState<HutangRow | null>(null);
   const [detail, setDetail] = useState<HutangDetail | undefined>(undefined);
 
   const jumlahBelumLunas = useMemo(() => data.filter((h) => h.status === "belum_lunas").length, [data]);
   const filtered = data.filter((h) => h.status === tab);
   const totalBelumLunas = useMemo(
-    () => data.filter((h) => h.status === "belum_lunas").reduce((sum, h) => sum + Number(h.jumlah), 0),
+    () => data.filter((h) => h.status === "belum_lunas").reduce((sum, h) => sum + Number(h.sisa), 0),
     [data]
   );
+
+  async function muatDetail(id: string) {
+    try {
+      const res = await fetch(`/api/hutang/${id}`);
+      const json = await res.json();
+      if (res.ok) setDetail(json.data);
+      else toast.error(json.error ?? "Gagal memuat detail hutang");
+    } catch {
+      toast.error("Tidak dapat menghubungi server. Coba lagi.");
+    }
+  }
 
   async function openDetail(row: HutangRow) {
     setDetailFor(row);
     setDetail(undefined);
-    const res = await fetch(`/api/hutang/${row.id}`);
-    const json = await res.json();
-    if (res.ok) setDetail(json.data);
-    else toast.error(json.error ?? "Gagal memuat detail hutang");
-  }
-
-  async function handleTandaiLunas() {
-    if (!lunasTarget) return;
-    setLoadingLunas(true);
-    try {
-      const res = await fetch(`/api/hutang/${lunasTarget.id}/lunas`, { method: "POST" });
-      const json = await res.json();
-      if (!res.ok) {
-        toast.error(json.error ?? "Gagal menandai hutang lunas");
-        return;
-      }
-      toast.success("Hutang ditandai lunas, pemasukan tercatat di Keuangan");
-      setLunasTarget(null);
-      router.refresh();
-    } finally {
-      setLoadingLunas(false);
-    }
+    await muatDetail(row.id);
   }
 
   return (
@@ -112,10 +93,17 @@ export function HutangList({ data }: { data: HutangRow[] }) {
                   </span>
                 </button>
                 <div className="flex items-center gap-3">
-                  <Currency value={h.jumlah} className="font-medium" />
+                  <div className="flex flex-col items-end">
+                    <Currency value={h.status === "lunas" ? h.jumlah : h.sisa} className="font-medium" />
+                    {h.status === "belum_lunas" && Number(h.dibayar) > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        dari <Currency value={h.jumlah} />
+                      </span>
+                    )}
+                  </div>
                   {h.status === "belum_lunas" && (
-                    <Button size="sm" onClick={() => setLunasTarget(h)}>
-                      Tandai Lunas
+                    <Button size="sm" onClick={() => setBayarTarget(h)}>
+                      Bayar
                     </Button>
                   )}
                 </div>
@@ -125,25 +113,18 @@ export function HutangList({ data }: { data: HutangRow[] }) {
         </div>
       )}
 
-      <HutangDetailDialog detail={detail} open={detailFor !== null} onOpenChange={(open) => !open && setDetailFor(null)} />
+      <HutangDetailDialog
+        detail={detail}
+        open={detailFor !== null}
+        onOpenChange={(open) => !open && setDetailFor(null)}
+        peran={peran}
+        onBerubah={() => {
+          if (detailFor) void muatDetail(detailFor.id);
+          router.refresh();
+        }}
+      />
 
-      <AlertDialog open={lunasTarget !== null} onOpenChange={(open) => !open && setLunasTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Tandai lunas — {lunasTarget?.namaPelanggan || "Tanpa nama"}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Setelah ditandai lunas, pemasukan sebesar <Currency value={lunasTarget?.jumlah ?? 0} /> akan tercatat di
-              modul Keuangan dengan tanggal hari ini.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleTandaiLunas} disabled={loadingLunas}>
-              {loadingLunas ? "Memproses..." : "Tandai Lunas"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <PembayaranHutangDialog hutang={bayarTarget} onOpenChange={(open) => !open && setBayarTarget(null)} />
     </div>
   );
 }

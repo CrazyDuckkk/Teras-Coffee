@@ -1,6 +1,6 @@
-import { and, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 import { db } from "@/db";
-import { bahanBaku, hutang, stockMasuk, transaksi } from "@/db/schema";
+import { bahanBaku, hutang, hutangPembayaran, stockMasuk, transaksi } from "@/db/schema";
 import { getRangeLastNDaysWIB, getTodayRangeWIB } from "@/lib/date";
 import { requireRole } from "@/lib/auth-guard";
 
@@ -29,10 +29,10 @@ export function getPeriodeRange(periode: PeriodeKeuangan): { start?: Date; end?:
 }
 
 /**
- * Keuangan = gabungan (bukan tabel terpisah): transaksi tunai/QRIS yang belum di-void + hutang yang SUDAH
- * LUNAS sebagai pemasukan (dengan tanggal_lunas, bukan tanggal transaksi awal), stock_masuk
- * sebagai pengeluaran. Transaksi void TIDAK dihitung. Hutang yang belum lunas belum masuk
- * cash-flow sama sekali — baru muncul di sini setelah ditandai lunas (lihat lib/queries/hutang.ts).
+ * Keuangan = gabungan (bukan tabel terpisah): transaksi tunai/QRIS yang belum di-void + setiap
+ * PEMBAYARAN hutang yang belum dibatalkan sebagai pemasukan (pada tanggal pembayarannya, bukan
+ * tanggal transaksi awal), stock_masuk sebagai pengeluaran. Transaksi void TIDAK dihitung.
+ * Sisa hutang yang belum dibayar belum masuk cash-flow (lihat lib/hutang-core.ts).
  */
 export async function getKeuangan(periode: PeriodeKeuangan = "30-hari") {
   await requireRole("owner");
@@ -45,23 +45,29 @@ export async function getKeuangan(periode: PeriodeKeuangan = "30-hari") {
   if (start) pemasukanLangsungFilters.push(gte(transaksi.tanggal, start));
   if (end) pemasukanLangsungFilters.push(lt(transaksi.tanggal, end));
 
-  const hutangLunasFilters = [eq(hutang.status, "lunas"), isNotNull(hutang.tanggalLunas)];
-  if (start) hutangLunasFilters.push(gte(hutang.tanggalLunas, start));
-  if (end) hutangLunasFilters.push(lt(hutang.tanggalLunas, end));
+  const pembayaranHutangFilters = [isNull(hutangPembayaran.dibatalkanAt)];
+  if (start) pembayaranHutangFilters.push(gte(hutangPembayaran.dibayarAt, start));
+  if (end) pembayaranHutangFilters.push(lt(hutangPembayaran.dibayarAt, end));
 
   const pengeluaranFilters = [];
   if (start) pengeluaranFilters.push(gte(stockMasuk.tanggal, start));
   if (end) pengeluaranFilters.push(lt(stockMasuk.tanggal, end));
 
-  const [pemasukanLangsungRows, hutangLunasRows, pengeluaranRows] = await Promise.all([
+  const [pemasukanLangsungRows, pembayaranHutangRows, pengeluaranRows] = await Promise.all([
     db
       .select({ id: transaksi.id, tanggal: transaksi.tanggal, jumlah: transaksi.totalPemasukan })
       .from(transaksi)
       .where(and(...pemasukanLangsungFilters)),
     db
-      .select({ id: hutang.id, tanggal: hutang.tanggalLunas, jumlah: hutang.jumlah, namaPelanggan: hutang.namaPelanggan })
-      .from(hutang)
-      .where(and(...hutangLunasFilters)),
+      .select({
+        id: hutangPembayaran.id,
+        tanggal: hutangPembayaran.dibayarAt,
+        jumlah: hutangPembayaran.jumlah,
+        namaPelanggan: hutang.namaPelanggan,
+      })
+      .from(hutangPembayaran)
+      .innerJoin(hutang, eq(hutang.id, hutangPembayaran.hutangId))
+      .where(and(...pembayaranHutangFilters)),
     db
       .select({
         id: stockMasuk.id,
@@ -84,11 +90,11 @@ export async function getKeuangan(periode: PeriodeKeuangan = "30-hari") {
       deskripsi: "Penjualan",
       jumlah: Number(r.jumlah),
     })),
-    ...hutangLunasRows.map((r) => ({
+    ...pembayaranHutangRows.map((r) => ({
       id: r.id,
-      tanggal: r.tanggal!,
+      tanggal: r.tanggal,
       tipe: "pemasukan" as const,
-      deskripsi: `Pelunasan Hutang${r.namaPelanggan ? ` — ${r.namaPelanggan}` : ""}`,
+      deskripsi: `Pembayaran Hutang${r.namaPelanggan ? ` — ${r.namaPelanggan}` : ""}`,
       jumlah: Number(r.jumlah),
     })),
     ...pengeluaranRows.map((r) => ({
@@ -102,7 +108,7 @@ export async function getKeuangan(periode: PeriodeKeuangan = "30-hari") {
 
   const totalPemasukan =
     pemasukanLangsungRows.reduce((sum, r) => sum + Number(r.jumlah), 0) +
-    hutangLunasRows.reduce((sum, r) => sum + Number(r.jumlah), 0);
+    pembayaranHutangRows.reduce((sum, r) => sum + Number(r.jumlah), 0);
   const totalPengeluaran = pengeluaranRows.reduce((sum, r) => sum + Number(r.jumlah), 0);
 
   return {

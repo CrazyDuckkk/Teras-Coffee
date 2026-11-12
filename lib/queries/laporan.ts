@@ -1,6 +1,6 @@
-import { and, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 import { db } from "@/db";
-import { detailTransaksi, hutang, menu, stockMasuk, transaksi } from "@/db/schema";
+import { detailTransaksi, hutangPembayaran, menu, stockMasuk, transaksi } from "@/db/schema";
 import { getMonthRangeWIB, getTodayRangeWIB, getWeekRangeWIB } from "@/lib/date";
 import { requireRole } from "@/lib/auth-guard";
 
@@ -33,8 +33,8 @@ function getPeriodeRange(periode: PeriodeLaporan): { start: Date; end: Date } {
  * Laporan dihitung live dari transaksi + stock_masuk (bukan tabel tersendiri, selaras
  * dengan pendekatan Keuangan). Pengajuan void tetap dihitung sampai disetujui.
  * - labaRugi = totalPemasukan - totalPengeluaran (periode) — angka CASH-FLOW: transaksi
- *   tunai/QRIS + hutang yang dilunasi dalam periode ini (berdasar tanggal_lunas), hutang yang
- *   belum lunas belum dihitung. Selaras dengan modul Keuangan & Tutup Kasir.
+ *   tunai/QRIS + pembayaran hutang yang diterima dalam periode ini (berdasar tanggal pembayaran,
+ *   pembayaran yang dibatalkan tidak dihitung), sisa hutang belum dihitung. Selaras dengan modul Keuangan & Tutup Kasir.
  * - menuTerlaris/menuMargin = ranking berdasarkan SEMUA penjualan yang belum di-void periode ini
  *   (termasuk hutang yang belum lunas — barang sudah keluar, terlepas dari status bayar).
  *   menuMargin dipakai untuk "Menu Paling Untung/Boncos" — margin per unit dipilih (bukan
@@ -44,7 +44,7 @@ export async function getLaporan(periode: PeriodeLaporan = "harian") {
   await requireRole("owner");
   const { start, end } = getPeriodeRange(periode);
 
-  const [transaksiRange, transaksiTunaiRange, hutangLunasRange, pengeluaranRange] = await Promise.all([
+  const [transaksiRange, transaksiTunaiRange, pembayaranHutangRange, pengeluaranRange] = await Promise.all([
     db
       .select({ id: transaksi.id, totalPemasukan: transaksi.totalPemasukan })
       .from(transaksi)
@@ -67,9 +67,9 @@ export async function getLaporan(periode: PeriodeLaporan = "harian") {
         )
       ),
     db
-      .select({ jumlah: hutang.jumlah })
-      .from(hutang)
-      .where(and(eq(hutang.status, "lunas"), isNotNull(hutang.tanggalLunas), gte(hutang.tanggalLunas, start), lt(hutang.tanggalLunas, end))),
+      .select({ jumlah: hutangPembayaran.jumlah })
+      .from(hutangPembayaran)
+      .where(and(isNull(hutangPembayaran.dibatalkanAt), gte(hutangPembayaran.dibayarAt, start), lt(hutangPembayaran.dibayarAt, end))),
     db
       .select({ totalPengeluaran: stockMasuk.totalPengeluaran })
       .from(stockMasuk)
@@ -78,7 +78,7 @@ export async function getLaporan(periode: PeriodeLaporan = "harian") {
 
   const totalPemasukan =
     transaksiTunaiRange.reduce((sum, t) => sum + Number(t.totalPemasukan), 0) +
-    hutangLunasRange.reduce((sum, h) => sum + Number(h.jumlah), 0);
+    pembayaranHutangRange.reduce((sum, h) => sum + Number(h.jumlah), 0);
   const totalPengeluaran = pengeluaranRange.reduce((sum, r) => sum + Number(r.totalPengeluaran), 0);
 
   let ranking: MenuRanking[] = [];

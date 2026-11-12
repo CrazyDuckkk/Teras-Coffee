@@ -8,6 +8,7 @@ export * from "./detail-transaksi-bahan";
 export * from "./stock-masuk";
 export * from "./tutup-kasir";
 export * from "./hutang";
+export * from "./hutang-pembayaran";
 export * from "./auth";
 export * from "./pengaturan";
 export * from "./pengajuan-void";

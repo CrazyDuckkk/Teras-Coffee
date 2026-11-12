@@ -50,6 +50,20 @@
       "when": 1794467479503,
       "tag": "0006_mushy_kinsey_walden",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794468517691,
+      "tag": "0007_silky_fenris",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794468527041,
+      "tag": "0008_m6_backfill_pembayaran_lunas",
+      "breakpoints": true
     }
   ]
 }
