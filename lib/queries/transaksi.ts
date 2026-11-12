@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   bahanBaku,
@@ -99,6 +99,7 @@ function hargaAktifSubquery(tx: DbOrTx) {
       hargaPerSatuan: riwayatHargaBahan.hargaPerSatuan,
     })
     .from(riwayatHargaBahan)
+    .where(isNull(riwayatHargaBahan.dibatalkanAt))
     .orderBy(riwayatHargaBahan.bahanBakuId, desc(riwayatHargaBahan.berlakuSejak), desc(riwayatHargaBahan.createdAt))
     .as("harga_aktif");
 }

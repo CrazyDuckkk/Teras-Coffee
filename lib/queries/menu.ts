@@ -1,4 +1,4 @@
-import { desc, eq, inArray } from "drizzle-orm";
+import { desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { bahanBaku, menu, resepMenu, riwayatHargaBahan } from "@/db/schema";
 import type { MenuInput } from "@/lib/validations/menu";
@@ -25,6 +25,7 @@ function hargaAktifSubquery() {
       hargaPerSatuan: riwayatHargaBahan.hargaPerSatuan,
     })
     .from(riwayatHargaBahan)
+    .where(isNull(riwayatHargaBahan.dibatalkanAt))
     .orderBy(riwayatHargaBahan.bahanBakuId, desc(riwayatHargaBahan.berlakuSejak), desc(riwayatHargaBahan.createdAt))
     .as("harga_aktif");
 }

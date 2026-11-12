@@ -19,4 +19,4 @@ export const bahanBaku = pgTable(
     uniqueIndex("bahan_baku_nama_lower_idx").on(sql`lower(${table.nama})`),
     check("bahan_baku_stok_non_negative", sql`${table.stokSaatIni} >= 0`),
   ]
-);
+).enableRLS();

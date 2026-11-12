@@ -302,6 +302,7 @@ Karena claude.md tidak lagi dipakai, aturan kerja berikut menggantikannya.
 - Halaman awal kasir adalah Transaksi.
 - Transaksi hutang yang sudah ada pembayarannya hanya bisa di-void oleh owner.
 - Nama menu owner untuk Inventaris adalah "Bahan Baku" (kasir: "Stok Bahan").
+- Konfirmasi harga Stock Masuk dilakukan per entri; koreksi owner membatalkan entri dengan alasan lalu mencatat entri pengganti.
 
 **Butir terbuka**
 
@@ -309,7 +310,6 @@ Karena claude.md tidak lagi dipakai, aturan kerja berikut menggantikannya.
 - Batas umur pengajuan persetujuan sebelum ditandai mencolok.
 - Ambang "menipis" untuk kemasan dan bahan lain.
 - Apakah perlu pencatatan sederhana untuk pengeluaran lain di luar bahan baku.
-- Apakah konfirmasi harga Stock Masuk dilakukan per item atau sekaligus.
 - Jumlah bahan dan menu yang perlu diatur kemasannya saat M4 (menentukan perlu tidaknya paket kemasan).
 
 ## 11. Ditunda dan di luar scope

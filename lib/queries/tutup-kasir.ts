@@ -65,7 +65,13 @@ async function calculateRingkasanHarian(now: Date): Promise<RingkasanHarian> {
     db
       .select({ totalPengeluaran: stockMasuk.totalPengeluaran })
       .from(stockMasuk)
-      .where(and(gte(stockMasuk.tanggal, start), lt(stockMasuk.tanggal, end))),
+      .where(
+        and(
+          isNull(stockMasuk.dibatalkanAt),
+          gte(stockMasuk.tanggal, start),
+          lt(stockMasuk.tanggal, end)
+        )
+      ),
   ]);
 
   const totalPenjualan =

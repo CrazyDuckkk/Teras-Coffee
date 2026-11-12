@@ -9,6 +9,7 @@ interface RiwayatHargaRow {
   id: string;
   hargaPerSatuan: string;
   berlakuSejak: string;
+  dibatalkanAt: string | null;
 }
 
 export function RiwayatHargaSheet({
@@ -24,6 +25,7 @@ export function RiwayatHargaSheet({
 }) {
   const [rows, setRows] = useState<RiwayatHargaRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const activeId = rows.find((row) => !row.dibatalkanAt)?.id;
 
   useEffect(() => {
     if (!open || !bahanBakuId) return;
@@ -56,13 +58,17 @@ export function RiwayatHargaSheet({
         <div className="flex flex-col gap-3 overflow-y-auto px-4 pb-4">
           {loading && <p className="text-sm text-muted-foreground">Memuat...</p>}
           {!loading && rows.length === 0 && <p className="text-sm text-muted-foreground">Belum ada riwayat harga.</p>}
-          {rows.map((row, idx) => (
+          {rows.map((row) => (
             <div key={row.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
               <div className="flex flex-col">
                 <Currency value={row.hargaPerSatuan} className="text-base font-semibold" />
                 <span className="text-xs text-muted-foreground">{formatTanggalWaktuWIB(new Date(row.berlakuSejak))}</span>
               </div>
-              {idx === 0 && <span className="text-xs font-medium text-success-foreground">Aktif</span>}
+              {row.dibatalkanAt ? (
+                <span className="text-xs text-muted-foreground">Dibatalkan</span>
+              ) : activeId === row.id ? (
+                <span className="text-xs font-medium text-success-foreground">Aktif</span>
+              ) : null}
             </div>
           ))}
         </div>

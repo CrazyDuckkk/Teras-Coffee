@@ -49,7 +49,7 @@ export async function getKeuangan(periode: PeriodeKeuangan = "30-hari") {
   if (start) pembayaranHutangFilters.push(gte(hutangPembayaran.dibayarAt, start));
   if (end) pembayaranHutangFilters.push(lt(hutangPembayaran.dibayarAt, end));
 
-  const pengeluaranFilters = [];
+  const pengeluaranFilters = [isNull(stockMasuk.dibatalkanAt)];
   if (start) pengeluaranFilters.push(gte(stockMasuk.tanggal, start));
   if (end) pengeluaranFilters.push(lt(stockMasuk.tanggal, end));
 

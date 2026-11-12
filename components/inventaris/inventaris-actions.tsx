@@ -5,11 +5,11 @@ import { Plus, PackagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TambahBahanDialog } from "./tambah-bahan-dialog";
 import { StockMasukDialog } from "./stock-masuk-dialog";
-import type { listBahanBaku } from "@/lib/queries/inventaris";
+import type { listStokBahan } from "@/lib/queries/inventaris";
 
-type BahanBaku = Awaited<ReturnType<typeof listBahanBaku>>[number];
+type BahanBaku = Awaited<ReturnType<typeof listStokBahan>>[number];
 
-export function InventarisActions({ bahanBaku }: { bahanBaku: BahanBaku[] }) {
+export function InventarisActions({ bahanBaku, isOwner = true }: { bahanBaku: BahanBaku[]; isOwner?: boolean }) {
   const [tambahOpen, setTambahOpen] = useState(false);
   const [stockMasukOpen, setStockMasukOpen] = useState(false);
 
@@ -19,12 +19,19 @@ export function InventarisActions({ bahanBaku }: { bahanBaku: BahanBaku[] }) {
         <PackagePlus className="size-4" />
         Stock Masuk
       </Button>
-      <Button onClick={() => setTambahOpen(true)}>
-        <Plus className="size-4" />
-        Bahan Baru
-      </Button>
-      <TambahBahanDialog open={tambahOpen} onOpenChange={setTambahOpen} />
-      <StockMasukDialog open={stockMasukOpen} onOpenChange={setStockMasukOpen} bahanBaku={bahanBaku} />
+      {isOwner && (
+        <Button onClick={() => setTambahOpen(true)}>
+          <Plus className="size-4" />
+          Bahan Baru
+        </Button>
+      )}
+      {isOwner && <TambahBahanDialog open={tambahOpen} onOpenChange={setTambahOpen} />}
+      <StockMasukDialog
+        open={stockMasukOpen}
+        onOpenChange={setStockMasukOpen}
+        bahanBaku={bahanBaku}
+        isOwner={isOwner}
+      />
     </div>
   );
 }
