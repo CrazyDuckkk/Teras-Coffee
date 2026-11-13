@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/tutup-kasir",
-      "schedule": "* * * * *"
+      "schedule": "59 16 * * *"
     }
   ]
 }
