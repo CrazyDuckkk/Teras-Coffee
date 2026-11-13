@@ -94,7 +94,7 @@ export function BahanBakuTable({ data }: { data: BahanBaku[] }) {
             : "Tidak ada bahan baku yang nonaktif."}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-[#E2E8F0] bg-card shadow-[0px_1px_3px_rgba(0,0,0,0.05)]">
+        <div className="overflow-hidden rounded-xl border border-[#E2E8F0] bg-card shadow-[0px_1px_3px_rgba(0,0,0,0.05)]">
           <Table>
             <TableHeader>
               <TableRow>
